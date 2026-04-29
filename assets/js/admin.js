@@ -445,6 +445,8 @@
                     ? 'Öncelik hesaplama aracı olmalı. Kısa açıklama, formül, örnek sonuç ve SSS bloğu ile yayınlanabilir.'
                     : 'Önce içerik iskeleti hazırlanmalı. Arama niyeti doğrulandıktan sonra hesaplama modülü eklenebilir.'
             );
+            $( '#hge-ai-insight-result' ).prop( 'hidden', true );
+            $( '#hge-ai-insight-status' ).removeClass( 'is-error' ).text( '' );
         }
 
         function renderCards() {
@@ -493,6 +495,60 @@
             event.preventDefault();
             selectCard( this );
         } );
+
+        $( '#hge-ai-insight-btn' ).off( '.hgeIdeas' ).on( 'click.hgeIdeas', function () {
+            const $btn = $( this );
+            const $selected = cards().filter( '.is-selected' ).first();
+            if ( ! $selected.length ) return;
+
+            $btn.prop( 'disabled', true ).text( 'AI analiz ediyor...' );
+            $( '#hge-ai-insight-status' ).removeClass( 'is-error' ).text( 'Kısa brief hazırlanıyor. Cache varsa token harcanmaz.' );
+
+            ajaxRequest( 'hge_ai_keyword_insight', {
+                keyword: $selected.data( 'keyword' ) || '',
+                monthly_volume: $selected.data( 'volume' ) || 0,
+                competition: $selected.data( 'competition' ) || 'UNKNOWN',
+                exists_on_site: parseInt( $selected.data( 'exists' ), 10 ) === 1 ? 1 : 0,
+                opportunity_score: $selected.data( 'score' ) || 0,
+            } )
+                .done( res => {
+                    if ( ! res.success ) {
+                        const msg = res.data && res.data.message ? res.data.message : HGE.i18n.error;
+                        $( '#hge-ai-insight-status' ).addClass( 'is-error' ).text( msg );
+                        return;
+                    }
+
+                    renderAiInsight( res.data.insight || {} );
+                    $( '#hge-ai-insight-status' ).text( res.data.cached ? 'Cache sonucu gösteriliyor.' : 'Yeni AI analizi hazır.' );
+                } )
+                .fail( xhr => {
+                    const msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                        ? xhr.responseJSON.data.message
+                        : HGE.i18n.error;
+                    $( '#hge-ai-insight-status' ).addClass( 'is-error' ).text( msg );
+                } )
+                .always( () => {
+                    $btn.prop( 'disabled', false ).text( 'AI ile analiz et' );
+                } );
+        } );
+
+        function renderAiInsight( insight ) {
+            $( '#hge-ai-content-angle' ).text( insight.content_angle || insight.why_important || '-' );
+            $( '#hge-ai-calculator-idea' ).text( insight.calculator_idea || '-' );
+            $( '#hge-ai-meta-title' ).text( insight.meta_title || '-' );
+            $( '#hge-ai-meta-description' ).text( insight.meta_description || '-' );
+            $( '#hge-ai-slug' ).text( insight.slug || '-' );
+
+            const $titles = $( '#hge-ai-title-list' ).empty();
+            ( insight.titles || [] ).slice( 0, 5 ).forEach( title => {
+                $( '<li />' ).text( title ).appendTo( $titles );
+            } );
+            if ( ! $titles.children().length ) {
+                $( '<li />' ).text( 'Başlık önerisi alınamadı.' ).appendTo( $titles );
+            }
+
+            $( '#hge-ai-insight-result' ).prop( 'hidden', false );
+        }
 
         renderCards();
         selectCard( cards().filter( '.is-selected' ).first().length ? cards().filter( '.is-selected' ).first() : cards().first() );

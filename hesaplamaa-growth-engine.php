@@ -38,6 +38,7 @@ function hge_load_files() {
         // API
         'includes/api/class-gsc-client.php',
         'includes/api/class-suggest-client.php',
+        'includes/api/class-openai-client.php',
         // Admin
         'includes/admin/class-menu.php',
         'includes/admin/class-dashboard.php',
@@ -45,6 +46,7 @@ function hge_load_files() {
         'includes/admin/class-page-analysis.php',
         'includes/admin/class-new-ideas.php',
         'includes/admin/class-settings.php',
+        'includes/admin/class-ai-settings.php',
         'includes/admin/class-github-settings.php',
         'includes/admin/class-system-status.php',
         // Cron

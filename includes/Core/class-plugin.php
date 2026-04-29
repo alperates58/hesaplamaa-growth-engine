@@ -27,6 +27,7 @@ final class Plugin {
 
         // Ayarlar sayfası
         ( new \HGE\Admin\Settings() )->register();
+        ( new \HGE\Admin\AISettings() )->register();
 
         // GitHub updater
         ( new \HGE\Core\GitHubUpdater() )->register();
@@ -36,6 +37,7 @@ final class Plugin {
 
         // Admin asset'leri yükle
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
+        add_action( 'admin_init', [ '\HGE\DB\Migrator', 'maybe_run' ] );
 
         // AJAX handler'ları
         add_action( 'wp_ajax_hge_get_dashboard_data',   [ $this, 'ajax_dashboard_data' ] );
@@ -45,6 +47,7 @@ final class Plugin {
         add_action( 'wp_ajax_hge_disconnect_gsc',       [ $this, 'ajax_disconnect_gsc' ] );
         add_action( 'wp_ajax_hge_sync_now',             [ $this, 'ajax_sync_now' ] );
         add_action( 'wp_ajax_hge_clear_cache',          [ $this, 'ajax_clear_cache' ] );
+        add_action( 'wp_ajax_hge_ai_keyword_insight',   [ $this, 'ajax_ai_keyword_insight' ] );
 
         // GSC OAuth redirect (admin_init üzerinden)
         add_action( 'admin_init', [ $this, 'handle_gsc_oauth_return' ] );
@@ -151,6 +154,53 @@ final class Plugin {
         $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_hge_%'" );
         $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_timeout_hge_%'" );
         wp_send_json_success( [ 'message' => __( 'Cache temizlendi.', 'hge' ) ] );
+    }
+
+    public function ajax_ai_keyword_insight(){
+        $this->verify_ajax_request();
+
+        $keyword = sanitize_text_field( wp_unslash( $_POST['keyword'] ?? '' ) );
+        if ( empty( $keyword ) ) {
+            wp_send_json_error( [ 'message' => __( 'Anahtar kelime eksik.', 'hge' ) ], 400 );
+        }
+
+        $repo   = new \HGE\DB\Repository();
+        $cached = $repo->get_ai_insight( $keyword );
+        if ( $cached ) {
+            wp_send_json_success( [
+                'cached'  => true,
+                'model'   => $cached['model'],
+                'insight' => $cached['insight'],
+            ] );
+        }
+
+        $client = new \HGE\API\OpenAIClient();
+        if ( ! $client->is_configured() ) {
+            wp_send_json_error( [ 'message' => __( 'AI entegrasyonu aktif değil veya API key eksik.', 'hge' ) ], 400 );
+        }
+
+        $payload = [
+            'keyword'           => $keyword,
+            'monthly_volume'    => (int) ( $_POST['monthly_volume'] ?? 0 ),
+            'competition'       => sanitize_text_field( wp_unslash( $_POST['competition'] ?? 'UNKNOWN' ) ),
+            'exists_on_site'    => ! empty( $_POST['exists_on_site'] ),
+            'opportunity_score' => (int) ( $_POST['opportunity_score'] ?? 0 ),
+        ];
+
+        $result = $client->generate_keyword_insight( $payload );
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( [ 'message' => $result->get_error_message() ], 500 );
+        }
+
+        $prompt_hash = hash( 'sha256', wp_json_encode( $payload ) );
+        $repo->save_ai_insight( $keyword, $result['model'], $result['insight'], $prompt_hash );
+
+        wp_send_json_success( [
+            'cached'  => false,
+            'model'   => $result['model'],
+            'insight' => $result['insight'],
+            'usage'   => $result['usage'],
+        ] );
     }
 
     /**

@@ -10,7 +10,13 @@ defined( 'ABSPATH' ) || exit;
 class Migrator {
 
     const DB_VERSION_OPTION = 'hge_db_version';
-    const DB_VERSION        = '1.0.0';
+    const DB_VERSION        = '1.1.0';
+
+    public static function maybe_run(){
+        if ( get_option( self::DB_VERSION_OPTION ) !== self::DB_VERSION ) {
+            self::run();
+        }
+    }
 
     public static function run(){
         global $wpdb;
@@ -86,6 +92,20 @@ class Migrator {
             KEY opp_score_idx (opportunity_score)
         ) $charset_collate;";
 
+        // ---- wp_hge_ai_insights --------------------------------------------
+        $sql[] = "CREATE TABLE {$wpdb->prefix}hge_ai_insights (
+            id              BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            keyword         VARCHAR(500)        NOT NULL,
+            model           VARCHAR(80)         NOT NULL DEFAULT '',
+            insight_json    LONGTEXT            NOT NULL,
+            prompt_hash     VARCHAR(64)         NOT NULL DEFAULT '',
+            created_at      DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at      DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY keyword_idx (keyword(191)),
+            KEY model_idx (model)
+        ) $charset_collate;";
+
         // ---- wp_hge_settings ------------------------------------------------
         $sql[] = "CREATE TABLE {$wpdb->prefix}hge_settings (
             id          INT(11)      NOT NULL AUTO_INCREMENT,
@@ -113,6 +133,7 @@ class Migrator {
             $wpdb->prefix . 'hge_daily_stats',
             $wpdb->prefix . 'hge_page_stats',
             $wpdb->prefix . 'hge_suggestions',
+            $wpdb->prefix . 'hge_ai_insights',
             $wpdb->prefix . 'hge_settings',
         ];
         foreach ( $tables as $table ) {

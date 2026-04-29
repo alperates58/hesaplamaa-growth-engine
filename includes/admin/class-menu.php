@@ -63,6 +63,13 @@ class Menu {
             ],
             [
                 'parent' => 'hge-dashboard',
+                'title'  => __( 'AI Entegrasyonu', 'hge' ),
+                'menu'   => __( 'AI Entegrasyonu', 'hge' ),
+                'slug'   => 'hge-ai-settings',
+                'cb'     => [ $this, 'render_ai_settings' ],
+            ],
+            [
+                'parent' => 'hge-dashboard',
                 'title'  => __( 'GitHub Ayarlari', 'hge' ),
                 'menu'   => __( 'GitHub Ayarlari', 'hge' ),
                 'slug'   => 'hge-github-settings',
@@ -107,6 +114,10 @@ class Menu {
 
     public function render_settings(){
         ( new Settings() )->render();
+    }
+
+    public function render_ai_settings(){
+        ( new AISettings() )->render();
     }
 
     public function render_github_settings(){

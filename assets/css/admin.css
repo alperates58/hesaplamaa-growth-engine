@@ -1663,6 +1663,69 @@ input[type="submit"].hge-btn { height: auto; padding: 10px 24px; }
     margin-top: 4px;
 }
 
+.hge-ai-insight-status {
+    min-height: 20px;
+    margin: 10px 0 0;
+    color: var(--ideas-muted);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.hge-ai-insight-status.is-error {
+    color: var(--ideas-red);
+}
+
+.hge-ai-insight-result {
+    margin-top: 12px;
+    border-top: 1px solid #edf2f7;
+}
+
+.hge-ai-title-list {
+    margin: 0;
+    padding-left: 18px;
+    color: #334155;
+}
+
+.hge-ai-title-list li {
+    margin-bottom: 8px;
+    line-height: 1.45;
+}
+
+.hge-ai-meta-box {
+    display: grid;
+    gap: 7px;
+    padding: 14px;
+    border: 1px solid #dbe7ff;
+    border-radius: 14px;
+    background: #f7faff;
+}
+
+.hge-ai-meta-box span {
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.hge-ai-meta-box strong,
+.hge-ai-meta-box p,
+.hge-ai-meta-box code {
+    margin: 0 0 6px;
+    color: #0f172a;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.hge-ai-meta-box code {
+    display: inline-flex;
+    width: fit-content;
+    padding: 3px 7px;
+    border-radius: 7px;
+    background: #eaf1ff;
+    color: #174ea6;
+}
+
 @media (max-width: 1280px) {
     .hge-ideas-workspace {
         grid-template-columns: 1fr;

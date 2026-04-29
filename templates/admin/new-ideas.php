@@ -201,7 +201,31 @@ if ( $today_count === 0 && $total_count > 0 ) {
                 <p id="hge-detail-recommendation">-</p>
             </div>
 
-            <button class="hge-detail-primary" type="button"><?php esc_html_e( 'Tek tıkla oluştur', 'hge' ); ?></button>
+            <button class="hge-detail-primary" id="hge-ai-insight-btn" type="button"><?php esc_html_e( 'AI ile analiz et', 'hge' ); ?></button>
+            <p class="hge-ai-insight-status" id="hge-ai-insight-status"></p>
+
+            <div class="hge-ai-insight-result" id="hge-ai-insight-result" hidden>
+                <div class="hge-detail-section">
+                    <h3><?php esc_html_e( 'AI içerik açısı', 'hge' ); ?></h3>
+                    <p id="hge-ai-content-angle"></p>
+                </div>
+                <div class="hge-detail-section">
+                    <h3><?php esc_html_e( 'AI hesaplama fikri', 'hge' ); ?></h3>
+                    <p id="hge-ai-calculator-idea"></p>
+                </div>
+                <div class="hge-detail-section">
+                    <h3><?php esc_html_e( 'Başlık önerileri', 'hge' ); ?></h3>
+                    <ul class="hge-ai-title-list" id="hge-ai-title-list"></ul>
+                </div>
+                <div class="hge-ai-meta-box">
+                    <span><?php esc_html_e( 'Meta title', 'hge' ); ?></span>
+                    <strong id="hge-ai-meta-title"></strong>
+                    <span><?php esc_html_e( 'Meta description', 'hge' ); ?></span>
+                    <p id="hge-ai-meta-description"></p>
+                    <span><?php esc_html_e( 'Slug', 'hge' ); ?></span>
+                    <code id="hge-ai-slug"></code>
+                </div>
+            </div>
         </aside>
     </section>
 </div>

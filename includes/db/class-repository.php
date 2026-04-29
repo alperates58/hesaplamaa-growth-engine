@@ -15,6 +15,7 @@ class Repository {
     public string $daily_stats;
     public string $page_stats;
     public string $suggestions;
+    public string $ai_insights;
 
     public function __construct() {
         global $wpdb;
@@ -23,6 +24,7 @@ class Repository {
         $this->daily_stats = $wpdb->prefix . 'hge_daily_stats';
         $this->page_stats  = $wpdb->prefix . 'hge_page_stats';
         $this->suggestions = $wpdb->prefix . 'hge_suggestions';
+        $this->ai_insights = $wpdb->prefix . 'hge_ai_insights';
     }
 
     // -------------------------------------------------------------------------
@@ -260,6 +262,57 @@ class Repository {
             ),
             ARRAY_A
         ) ?: [];
+    }
+
+    public function get_ai_insight( string $keyword ){
+        $row = $this->wpdb->get_row(
+            $this->wpdb->prepare(
+                "SELECT * FROM {$this->ai_insights} WHERE keyword = %s LIMIT 1",
+                $keyword
+            ),
+            ARRAY_A
+        );
+
+        if ( empty( $row ) || empty( $row['insight_json'] ) ) {
+            return null;
+        }
+
+        $decoded = json_decode( (string) $row['insight_json'], true );
+        if ( ! is_array( $decoded ) ) {
+            return null;
+        }
+
+        $row['insight'] = $decoded;
+        return $row;
+    }
+
+    public function save_ai_insight( string $keyword, string $model, array $insight, string $prompt_hash = '' ){
+        $json = wp_json_encode( $insight, JSON_UNESCAPED_UNICODE );
+        if ( ! $json ) {
+            return false;
+        }
+
+        $existing_id = $this->wpdb->get_var(
+            $this->wpdb->prepare(
+                "SELECT id FROM {$this->ai_insights} WHERE keyword = %s",
+                $keyword
+            )
+        );
+
+        $data = [
+            'keyword'      => sanitize_text_field( $keyword ),
+            'model'        => sanitize_text_field( $model ),
+            'insight_json' => $json,
+            'prompt_hash'  => sanitize_text_field( $prompt_hash ),
+            'updated_at'   => current_time( 'mysql' ),
+        ];
+
+        if ( $existing_id ) {
+            return (bool) $this->wpdb->update( $this->ai_insights, $data, [ 'id' => $existing_id ] );
+        }
+
+        $data['created_at'] = current_time( 'mysql' );
+        return (bool) $this->wpdb->insert( $this->ai_insights, $data );
     }
 
     // -------------------------------------------------------------------------
