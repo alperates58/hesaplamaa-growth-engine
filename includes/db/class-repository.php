@@ -235,7 +235,18 @@ class Repository {
             )
         );
         if ( $exists ) {
-            return true; // zaten var
+            return (bool) $this->wpdb->update(
+                $this->suggestions,
+                [
+                    'monthly_volume'    => (int) ( $row['monthly_volume'] ?? 0 ),
+                    'competition'       => sanitize_text_field( $row['competition'] ?? 'unknown' ),
+                    'opportunity_score' => (int) ( $row['opportunity_score'] ?? 0 ),
+                    'exists_on_site'    => (int) ( $row['exists_on_site'] ?? 0 ),
+                    'should_create'     => (int) ( $row['should_create'] ?? 0 ),
+                    'source'            => sanitize_text_field( $row['source'] ?? 'suggest' ),
+                ],
+                [ 'id' => $exists ]
+            );
         }
 
         return (bool) $this->wpdb->insert(

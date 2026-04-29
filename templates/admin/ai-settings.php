@@ -68,6 +68,30 @@
                         <small class="hge-field-hint"><?php esc_html_e( 'Token kontrolü için her gün kaç yeni AI analizi yapılabileceğini sınırlar.', 'hge' ); ?></small>
                     </div>
 
+                    <label class="hge-toggle-label">
+                        <input type="checkbox" name="hge_ai_settings[seed_enabled]" value="1" <?php checked( ! empty( $settings['seed_enabled'] ) ); ?>>
+                        <?php esc_html_e( 'Yeni fikir taramada AI seed konu üretimini kullan', 'hge' ); ?>
+                    </label>
+
+                    <label class="hge-toggle-label">
+                        <input type="checkbox" name="hge_ai_settings[metrics_enabled]" value="1" <?php checked( ! empty( $settings['metrics_enabled'] ) ); ?>>
+                        <?php esc_html_e( 'Hacim ve rekabet için AI tahmini kullan', 'hge' ); ?>
+                    </label>
+
+                    <div class="hge-field">
+                        <label for="hge_ai_seed_limit"><?php esc_html_e( 'AI seed konu limiti', 'hge' ); ?></label>
+                        <input
+                            id="hge_ai_seed_limit"
+                            name="hge_ai_settings[seed_limit]"
+                            type="number"
+                            min="10"
+                            max="60"
+                            class="hge-input hge-input-small"
+                            value="<?php echo esc_attr( (int) ( $settings['seed_limit'] ?? 25 ) ); ?>"
+                        />
+                        <small class="hge-field-hint"><?php esc_html_e( 'AI sadece ana konu listesi üretir; gerçek öneriler yine Google Suggest ile doğrulanır.', 'hge' ); ?></small>
+                    </div>
+
                     <div class="hge-form-actions">
                         <?php submit_button( __( 'AI Ayarlarını Kaydet', 'hge' ), 'hge-btn hge-btn-primary', 'submit', false ); ?>
                     </div>
@@ -94,6 +118,14 @@
                     <tr>
                         <td><?php esc_html_e( 'Token stratejisi', 'hge' ); ?></td>
                         <td><?php esc_html_e( 'Kısa JSON girdi ve kısa JSON çıktı', 'hge' ); ?></td>
+                    </tr>
+                    <tr>
+                        <td><?php esc_html_e( 'Fikir tarama AI', 'hge' ); ?></td>
+                        <td><?php echo ! empty( $settings['seed_enabled'] ) ? esc_html__( 'Aktif: AI seed + Google Suggest', 'hge' ) : esc_html__( 'Pasif: kod içi seed listesi', 'hge' ); ?></td>
+                    </tr>
+                    <tr>
+                        <td><?php esc_html_e( 'Hacim / rekabet', 'hge' ); ?></td>
+                        <td><?php echo ! empty( $settings['metrics_enabled'] ) ? esc_html__( 'AI tahmini aktif', 'hge' ) : esc_html__( 'Lokal tahmin aktif', 'hge' ); ?></td>
                     </tr>
                 </table>
                 <p class="hge-text-muted">

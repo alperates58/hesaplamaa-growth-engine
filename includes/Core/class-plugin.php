@@ -48,6 +48,7 @@ final class Plugin {
         add_action( 'wp_ajax_hge_sync_now',             [ $this, 'ajax_sync_now' ] );
         add_action( 'wp_ajax_hge_clear_cache',          [ $this, 'ajax_clear_cache' ] );
         add_action( 'wp_ajax_hge_ai_keyword_insight',   [ $this, 'ajax_ai_keyword_insight' ] );
+        add_action( 'wp_ajax_hge_ai_topic_ideas',       [ $this, 'ajax_ai_topic_ideas' ] );
 
         // GSC OAuth redirect (admin_init üzerinden)
         add_action( 'admin_init', [ $this, 'handle_gsc_oauth_return' ] );
@@ -200,6 +201,27 @@ final class Plugin {
             'model'   => $result['model'],
             'insight' => $result['insight'],
             'usage'   => $result['usage'],
+        ] );
+    }
+
+    public function ajax_ai_topic_ideas(){
+        $this->verify_ajax_request();
+
+        $topic = sanitize_text_field( wp_unslash( $_POST['topic'] ?? '' ) );
+        if ( empty( $topic ) ) {
+            wp_send_json_error( [ 'message' => __( 'Konu girin. Örnek: sağlık, finans, zaman.', 'hge' ) ], 400 );
+        }
+
+        $ideas = new \HGE\Admin\NewIdeas();
+        $result = $ideas->generate_topic_ideas( $topic );
+
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( [ 'message' => $result->get_error_message() ], 500 );
+        }
+
+        wp_send_json_success( [
+            'message' => __( 'AI konu fikirleri eklendi.', 'hge' ),
+            'count'   => count( $result ),
         ] );
     }
 

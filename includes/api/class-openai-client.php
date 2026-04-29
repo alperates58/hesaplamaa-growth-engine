@@ -14,6 +14,9 @@ class OpenAIClient {
             'model'       => 'gpt-5-mini',
             'daily_limit' => 50,
             'enabled'     => false,
+            'seed_enabled'=> false,
+            'seed_limit'  => 25,
+            'metrics_enabled' => false,
         ] );
     }
 
@@ -80,6 +83,277 @@ class OpenAIClient {
             'insight' => $this->sanitize_insight( $data ),
             'usage'   => $body['usage'] ?? null,
         ];
+    }
+
+    public function generate_seed_keywords(){
+        $settings = $this->get_settings();
+
+        if ( empty( $settings['api_key'] ) ) {
+            return new \WP_Error( 'hge_openai_missing_key', __( 'OpenAI API key tanımlı değil.', 'hge' ) );
+        }
+
+        if ( ! $this->has_daily_quota() ) {
+            return new \WP_Error( 'hge_openai_limit', __( 'Günlük AI analiz limiti doldu.', 'hge' ) );
+        }
+
+        $cache_key = 'hge_ai_seed_keywords_' . md5( (string) ( $settings['model'] ?? 'gpt-5-mini' ) . '_' . (int) ( $settings['seed_limit'] ?? 25 ) );
+        $cached    = get_transient( $cache_key );
+        if ( is_array( $cached ) && ! empty( $cached ) ) {
+            return $cached;
+        }
+
+        $model = sanitize_text_field( $settings['model'] ?: 'gpt-5-mini' );
+        $limit = max( 10, min( 60, (int) ( $settings['seed_limit'] ?? 25 ) ) );
+
+        $response = wp_remote_post( 'https://api.openai.com/v1/responses', [
+            'timeout' => 35,
+            'headers' => [
+                'Authorization' => 'Bearer ' . $settings['api_key'],
+                'Content-Type'  => 'application/json',
+            ],
+            'body' => wp_json_encode( [
+                'model' => $model,
+                'input' => [
+                    [
+                        'role' => 'system',
+                        'content' => 'Sen Türkçe SEO fırsatları bulan bir asistansın. Sadece geçerli JSON döndür. Kısa, arama odaklı seed keywordler üret.',
+                    ],
+                    [
+                        'role' => 'user',
+                        'content' => "hesaplamaa.com için Google Suggest'e gönderilecek {$limit} adet ana seed keyword üret. Sadece hesaplama aracı potansiyeli olan finans, maaş, kredi, vergi, sağlık, eğitim, tarih, ölçüm, günlük hayat ve resmi işlem konularını kapsa. Marka adı yazma. JSON formatı: {\"seeds\":[\"...\"]}",
+                    ],
+                ],
+                'max_output_tokens' => 500,
+                'text' => [
+                    'format' => [
+                        'type' => 'json_object',
+                    ],
+                ],
+            ], JSON_UNESCAPED_UNICODE ),
+        ] );
+
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+
+        $code = (int) wp_remote_retrieve_response_code( $response );
+        $body = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+
+        if ( $code < 200 || $code >= 300 ) {
+            $message = $body['error']['message'] ?? __( 'OpenAI isteği başarısız oldu.', 'hge' );
+            return new \WP_Error( 'hge_openai_error', $message );
+        }
+
+        $text = $this->extract_output_text( is_array( $body ) ? $body : [] );
+        $data = json_decode( $text, true );
+        $seeds = [];
+
+        foreach ( (array) ( $data['seeds'] ?? [] ) as $seed ) {
+            $seed = sanitize_text_field( $seed );
+            if ( $seed !== '' && strlen( $seed ) <= 120 ) {
+                $seeds[] = strtolower( $seed );
+            }
+        }
+
+        $seeds = array_values( array_unique( array_slice( $seeds, 0, $limit ) ) );
+        if ( empty( $seeds ) ) {
+            return new \WP_Error( 'hge_openai_empty_seeds', __( 'AI seed konu üretemedi.', 'hge' ) );
+        }
+
+        $this->increment_daily_usage();
+        set_transient( $cache_key, $seeds, 7 * DAY_IN_SECONDS );
+
+        return $seeds;
+    }
+
+    public function estimate_keyword_metrics( array $keywords ){
+        $settings = $this->get_settings();
+
+        if ( empty( $settings['api_key'] ) ) {
+            return new \WP_Error( 'hge_openai_missing_key', __( 'OpenAI API key tanımlı değil.', 'hge' ) );
+        }
+
+        if ( ! $this->has_daily_quota() ) {
+            return new \WP_Error( 'hge_openai_limit', __( 'Günlük AI analiz limiti doldu.', 'hge' ) );
+        }
+
+        $keywords = array_values( array_filter( array_map( 'sanitize_text_field', $keywords ) ) );
+        $keywords = array_slice( array_unique( $keywords ), 0, 30 );
+
+        if ( empty( $keywords ) ) {
+            return [];
+        }
+
+        $cache_key = 'hge_ai_metric_estimates_' . md5( implode( '|', $keywords ) );
+        $cached    = get_transient( $cache_key );
+        if ( is_array( $cached ) ) {
+            return $cached;
+        }
+
+        $model = sanitize_text_field( $settings['model'] ?: 'gpt-5-mini' );
+
+        $response = wp_remote_post( 'https://api.openai.com/v1/responses', [
+            'timeout' => 35,
+            'headers' => [
+                'Authorization' => 'Bearer ' . $settings['api_key'],
+                'Content-Type'  => 'application/json',
+            ],
+            'body' => wp_json_encode( [
+                'model' => $model,
+                'input' => [
+                    [
+                        'role' => 'system',
+                        'content' => 'Sen Türkçe SEO keyword metriklerini kaba tahmin eden bir asistansın. Gerçek Ads verisi yoksa makul aralık tahmini yap. Sadece JSON döndür.',
+                    ],
+                    [
+                        'role' => 'user',
+                        'content' => 'Aşağıdaki keywordler için Türkiye pazarı aylık arama hacmi tahmini ve rekabet seviyesi üret. competition yalnızca LOW, MEDIUM, HIGH olabilir. JSON formatı: {"metrics":[{"keyword":"...","monthly_volume":1000,"competition":"MEDIUM"}]}. Keywordler: ' . wp_json_encode( $keywords, JSON_UNESCAPED_UNICODE ),
+                    ],
+                ],
+                'max_output_tokens' => 900,
+                'text' => [
+                    'format' => [
+                        'type' => 'json_object',
+                    ],
+                ],
+            ], JSON_UNESCAPED_UNICODE ),
+        ] );
+
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+
+        $code = (int) wp_remote_retrieve_response_code( $response );
+        $body = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+
+        if ( $code < 200 || $code >= 300 ) {
+            $message = $body['error']['message'] ?? __( 'OpenAI isteği başarısız oldu.', 'hge' );
+            return new \WP_Error( 'hge_openai_error', $message );
+        }
+
+        $text = $this->extract_output_text( is_array( $body ) ? $body : [] );
+        $data = json_decode( $text, true );
+        $metrics = [];
+
+        foreach ( (array) ( $data['metrics'] ?? [] ) as $item ) {
+            $keyword = sanitize_text_field( $item['keyword'] ?? '' );
+            if ( $keyword === '' ) {
+                continue;
+            }
+
+            $competition = strtoupper( sanitize_text_field( $item['competition'] ?? 'MEDIUM' ) );
+            if ( ! in_array( $competition, [ 'LOW', 'MEDIUM', 'HIGH' ], true ) ) {
+                $competition = 'MEDIUM';
+            }
+
+            $metrics[ $keyword ] = [
+                'monthly_volume' => max( 0, (int) ( $item['monthly_volume'] ?? 0 ) ),
+                'competition'    => $competition,
+            ];
+        }
+
+        $this->increment_daily_usage();
+        set_transient( $cache_key, $metrics, 30 * DAY_IN_SECONDS );
+
+        return $metrics;
+    }
+
+    public function generate_topic_calculator_ideas( string $topic ){
+        $settings = $this->get_settings();
+
+        if ( empty( $settings['api_key'] ) ) {
+            return new \WP_Error( 'hge_openai_missing_key', __( 'OpenAI API key tanımlı değil.', 'hge' ) );
+        }
+
+        if ( ! $this->has_daily_quota() ) {
+            return new \WP_Error( 'hge_openai_limit', __( 'Günlük AI analiz limiti doldu.', 'hge' ) );
+        }
+
+        $topic = sanitize_text_field( $topic );
+        if ( $topic === '' ) {
+            return new \WP_Error( 'hge_openai_empty_topic', __( 'Konu alanı boş.', 'hge' ) );
+        }
+
+        $cache_key = 'hge_ai_topic_ideas_' . md5( strtolower( $topic ) );
+        $cached    = get_transient( $cache_key );
+        if ( is_array( $cached ) && ! empty( $cached ) ) {
+            return $cached;
+        }
+
+        $model = sanitize_text_field( $settings['model'] ?: 'gpt-5-mini' );
+
+        $response = wp_remote_post( 'https://api.openai.com/v1/responses', [
+            'timeout' => 35,
+            'headers' => [
+                'Authorization' => 'Bearer ' . $settings['api_key'],
+                'Content-Type'  => 'application/json',
+            ],
+            'body' => wp_json_encode( [
+                'model' => $model,
+                'input' => [
+                    [
+                        'role' => 'system',
+                        'content' => 'Sen Türkçe hesaplama aracı fikirleri bulan bir SEO ürün uzmanısın. Sadece JSON döndür.',
+                    ],
+                    [
+                        'role' => 'user',
+                        'content' => "\"{$topic}\" alanı için hesaplamaa.com sitesine eklenmesi en mantıklı 20 hesaplama aracını öner. Her fikir arama niyetli keyword olmalı ve \"... hesaplama\" kalıbına yakın olmalı. Türkiye pazarı için aylık hacim tahmini, rekabet ve fırsat skoru ver. competition LOW, MEDIUM, HIGH olmalı. JSON: {\"ideas\":[{\"keyword\":\"...\",\"monthly_volume\":1000,\"competition\":\"MEDIUM\",\"opportunity_score\":80,\"reason\":\"...\"}]}",
+                    ],
+                ],
+                'max_output_tokens' => 1400,
+                'text' => [
+                    'format' => [
+                        'type' => 'json_object',
+                    ],
+                ],
+            ], JSON_UNESCAPED_UNICODE ),
+        ] );
+
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+
+        $code = (int) wp_remote_retrieve_response_code( $response );
+        $body = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+
+        if ( $code < 200 || $code >= 300 ) {
+            $message = $body['error']['message'] ?? __( 'OpenAI isteği başarısız oldu.', 'hge' );
+            return new \WP_Error( 'hge_openai_error', $message );
+        }
+
+        $text = $this->extract_output_text( is_array( $body ) ? $body : [] );
+        $data = json_decode( $text, true );
+        $ideas = [];
+
+        foreach ( (array) ( $data['ideas'] ?? [] ) as $item ) {
+            $keyword = sanitize_text_field( $item['keyword'] ?? '' );
+            if ( $keyword === '' ) {
+                continue;
+            }
+
+            $competition = strtoupper( sanitize_text_field( $item['competition'] ?? 'MEDIUM' ) );
+            if ( ! in_array( $competition, [ 'LOW', 'MEDIUM', 'HIGH' ], true ) ) {
+                $competition = 'MEDIUM';
+            }
+
+            $ideas[] = [
+                'keyword'           => $keyword,
+                'monthly_volume'    => max( 0, (int) ( $item['monthly_volume'] ?? 0 ) ),
+                'competition'       => $competition,
+                'opportunity_score' => max( 1, min( 100, (int) ( $item['opportunity_score'] ?? 70 ) ) ),
+                'reason'            => sanitize_textarea_field( $item['reason'] ?? '' ),
+            ];
+        }
+
+        $ideas = array_slice( $ideas, 0, 20 );
+        if ( empty( $ideas ) ) {
+            return new \WP_Error( 'hge_openai_empty_ideas', __( 'AI bu konu için fikir üretemedi.', 'hge' ) );
+        }
+
+        $this->increment_daily_usage();
+        set_transient( $cache_key, $ideas, 14 * DAY_IN_SECONDS );
+
+        return $ideas;
     }
 
     private function build_prompt( array $payload ){

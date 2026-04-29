@@ -1289,6 +1289,47 @@ input[type="submit"].hge-btn { height: auto; padding: 10px 24px; }
     margin-bottom: 16px;
 }
 
+.hge-topic-discovery {
+    display: flex;
+    flex: 1.1;
+    min-width: 320px;
+    padding: 4px;
+    border: 1px solid #dce5f0;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+
+.hge-topic-discovery input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    padding: 10px 12px;
+    background: transparent;
+    color: #0f172a;
+    font-size: 14px;
+    outline: none;
+}
+
+.hge-topic-discovery button {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 8px 12px;
+    border: 1px solid #dbe7ff;
+    border-radius: 10px;
+    background: #eef4ff;
+    color: var(--ideas-blue);
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.hge-topic-discovery button:disabled {
+    opacity: .6;
+    cursor: wait;
+}
+
 .hge-ideas-search {
     position: relative;
     flex: 1;

@@ -490,6 +490,37 @@
             renderCards();
         } );
 
+        $( '#hge-ai-topic-btn' ).off( '.hgeIdeas' ).on( 'click.hgeIdeas', function () {
+            const $btn = $( this );
+            const topic = ( $( '#hge-ai-topic-input' ).val() || '' ).toString().trim();
+
+            if ( ! topic ) {
+                toast( 'Bir konu girin: sağlık, finans, zaman gibi.', 'error' );
+                return;
+            }
+
+            $btn.prop( 'disabled', true ).text( 'AI tarıyor...' );
+
+            ajaxRequest( 'hge_ai_topic_ideas', { topic } )
+                .done( res => {
+                    if ( res.success ) {
+                        toast( 'AI konu fikirleri eklendi. Liste yenileniyor.', 'success' );
+                        setTimeout( () => location.reload(), 900 );
+                    } else {
+                        toast( res.data.message || HGE.i18n.error, 'error' );
+                    }
+                } )
+                .fail( xhr => {
+                    const msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                        ? xhr.responseJSON.data.message
+                        : HGE.i18n.error;
+                    toast( msg, 'error' );
+                } )
+                .always( () => {
+                    $btn.prop( 'disabled', false ).text( 'AI ile konu öner' );
+                } );
+        } );
+
         $( document ).off( 'click.hgeIdeasCard keydown.hgeIdeasCard' ).on( 'click.hgeIdeasCard keydown.hgeIdeasCard', '.hge-idea-card', function ( event ) {
             if ( event.type === 'keydown' && event.key !== 'Enter' && event.key !== ' ' ) return;
             event.preventDefault();

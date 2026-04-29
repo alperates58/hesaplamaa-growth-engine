@@ -37,6 +37,9 @@ class AISettings {
             'api_key'     => $api_key,
             'model'       => $model,
             'daily_limit' => max( 5, min( 500, (int) ( $input['daily_limit'] ?? 50 ) ) ),
+            'seed_enabled'=> ! empty( $input['seed_enabled'] ),
+            'seed_limit'  => max( 10, min( 60, (int) ( $input['seed_limit'] ?? 25 ) ) ),
+            'metrics_enabled' => ! empty( $input['metrics_enabled'] ),
         ];
     }
 

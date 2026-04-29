@@ -73,14 +73,16 @@ class SuggestClient {
         $results = [];
         $seen    = [];
 
-        foreach ( $this->seed_keywords as $seed ) {
+        foreach ( $this->get_active_seed_keywords() as $seed ) {
+            $seed_source = in_array( $seed, $this->seed_keywords, true ) ? 'google_suggest' : 'ai_seed_google_suggest';
             $suggestions = $this->get_suggestions( $seed );
             foreach ( $suggestions as $suggestion ) {
                 if ( ! isset( $seen[ $suggestion ] ) ) {
                     $seen[ $suggestion ] = true;
                     $results[] = [
-                        'keyword' => $suggestion,
-                        'seed'    => $seed,
+                        'keyword'     => $suggestion,
+                        'seed'        => $seed,
+                        'seed_source' => $seed_source,
                     ];
                 }
             }
@@ -112,6 +114,9 @@ class SuggestClient {
         return array_map( function ( array $item ) use ( $existing_slugs ){
             $slug                 = sanitize_title( $item['keyword'] );
             $item['exists_on_site'] = in_array( $slug, $existing_slugs, true ) ? 1 : 0;
+            $metrics              = $this->estimate_local_metrics( $item['keyword'] );
+            $item['monthly_volume'] = (int) ( $item['monthly_volume'] ?? $metrics['monthly_volume'] );
+            $item['competition']    = sanitize_text_field( $item['competition'] ?? $metrics['competition'] );
             $item['opportunity_score'] = $this->score_suggestion( $item );
             $item['should_create']    = ( ! $item['exists_on_site'] && $item['opportunity_score'] >= 60 ) ? 1 : 0;
             return $item;
@@ -135,7 +140,103 @@ class SuggestClient {
         return min( 100, $score );
     }
 
+    private function estimate_local_metrics( string $keyword ){
+        $keyword = strtolower( $keyword );
+        $volume = 450;
+        $competition = 'LOW';
+
+        $high_volume_terms = [ 'maaş', 'kredi', 'faiz', 'vergi', 'emeklilik', 'gebelik', 'yaş', 'bmi', 'kilo' ];
+        foreach ( $high_volume_terms as $term ) {
+            if ( strpos( $keyword, $term ) !== false ) {
+                $volume = 5400;
+                $competition = 'HIGH';
+                break;
+            }
+        }
+
+        $medium_terms = [ 'puan', 'vade', 'oran', 'yüzde', 'tarih', 'gün', 'hafta', 'beden' ];
+        foreach ( $medium_terms as $term ) {
+            if ( strpos( $keyword, $term ) !== false && $volume < 1000 ) {
+                $volume = 1900;
+                $competition = 'MEDIUM';
+                break;
+            }
+        }
+
+        if ( strpos( $keyword, '2025' ) !== false || strpos( $keyword, '2026' ) !== false ) {
+            $volume = (int) round( $volume * 1.35 );
+        }
+
+        if ( strpos( $keyword, 'nasıl' ) !== false || strpos( $keyword, 'formülü' ) !== false ) {
+            $competition = $competition === 'HIGH' ? 'MEDIUM' : $competition;
+        }
+
+        return [
+            'monthly_volume' => $volume,
+            'competition'    => $competition,
+        ];
+    }
+
+    public function get_ai_metric_estimates( array $keywords ){
+        if ( ! class_exists( '\HGE\API\OpenAIClient' ) ) {
+            return [];
+        }
+
+        $client   = new OpenAIClient();
+        $settings = $client->get_settings();
+
+        if ( empty( $settings['enabled'] ) || empty( $settings['metrics_enabled'] ) || empty( $settings['api_key'] ) ) {
+            return [];
+        }
+
+        $all_metrics = [];
+        foreach ( array_chunk( $keywords, 30 ) as $chunk ) {
+            $metrics = $client->estimate_keyword_metrics( $chunk );
+            if ( is_wp_error( $metrics ) || ! is_array( $metrics ) ) {
+                continue;
+            }
+            $all_metrics = array_merge( $all_metrics, $metrics );
+        }
+
+        return $all_metrics;
+    }
+
     public function get_seed_keywords(){
         return $this->seed_keywords;
+    }
+
+    public function get_active_seed_keywords(){
+        $seeds = $this->seed_keywords;
+        $ai_seeds = $this->get_ai_seed_keywords();
+
+        if ( ! empty( $ai_seeds ) ) {
+            $seeds = array_merge( $ai_seeds, $seeds );
+        }
+
+        $seeds = array_map( 'sanitize_text_field', $seeds );
+        $seeds = array_filter( $seeds );
+        $seeds = array_values( array_unique( $seeds ) );
+
+        return array_slice( $seeds, 0, 80 );
+    }
+
+    private function get_ai_seed_keywords(){
+        if ( ! class_exists( '\HGE\API\OpenAIClient' ) ) {
+            return [];
+        }
+
+        $client   = new OpenAIClient();
+        $settings = $client->get_settings();
+
+        if ( empty( $settings['enabled'] ) || empty( $settings['seed_enabled'] ) || empty( $settings['api_key'] ) ) {
+            return [];
+        }
+
+        $seeds = $client->generate_seed_keywords();
+        if ( is_wp_error( $seeds ) || empty( $seeds ) || ! is_array( $seeds ) ) {
+            return [];
+        }
+
+        return $seeds;
     }
 }

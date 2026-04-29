@@ -66,6 +66,10 @@ if ( $today_count === 0 && $total_count > 0 ) {
     <section class="hge-ideas-workspace">
         <div class="hge-ideas-list-shell">
             <div class="hge-ideas-controls">
+                <div class="hge-topic-discovery">
+                    <input type="text" id="hge-ai-topic-input" placeholder="<?php esc_attr_e( 'Sağlık, finans, zaman...', 'hge' ); ?>">
+                    <button type="button" id="hge-ai-topic-btn"><?php esc_html_e( 'AI ile konu öner', 'hge' ); ?></button>
+                </div>
                 <div class="hge-ideas-search">
                     <span></span>
                     <input type="search" id="hge-idea-search" placeholder="<?php esc_attr_e( 'Fırsatlarda ara', 'hge' ); ?>">
