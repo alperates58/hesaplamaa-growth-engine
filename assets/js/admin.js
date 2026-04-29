@@ -234,7 +234,9 @@
         ajaxRequest( 'hge_test_google_ads', {}, this )
             .done( res => {
                 if ( res.success ) {
-                    $result.addClass( 'success' ).text( res.data.message || 'Google Ads API bağlantısı başarılı.' );
+                    const firstMetric = res.data.metrics ? Object.values( res.data.metrics )[0] : null;
+                    const suffix = firstMetric ? ` Örnek hacim: ${ firstMetric.monthly_volume }, rekabet: ${ firstMetric.competition }.` : '';
+                    $result.addClass( 'success' ).text( ( res.data.message || 'Google Ads API bağlantısı başarılı.' ) + suffix );
                 } else {
                     $result.addClass( 'error' ).text( res.data.message || HGE.i18n.error );
                 }

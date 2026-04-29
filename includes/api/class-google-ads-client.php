@@ -8,6 +8,7 @@ class GoogleAdsClient {
     const API_VERSION = 'v22';
 
     private array $settings;
+    private string $last_error = '';
 
     public function __construct() {
         $this->settings = get_option( 'hge_settings', [] );
@@ -31,6 +32,7 @@ class GoogleAdsClient {
         }
 
         if ( ! $this->is_configured() ) {
+            $this->last_error = __( 'Google Ads API ayarları eksik.', 'hge' );
             return [];
         }
 
@@ -42,6 +44,7 @@ class GoogleAdsClient {
 
         $token = $this->get_access_token();
         if ( is_wp_error( $token ) ) {
+            $this->last_error = $token->get_error_message();
             return [];
         }
 
@@ -82,6 +85,7 @@ class GoogleAdsClient {
         ] );
 
         if ( is_wp_error( $response ) ) {
+            $this->last_error = $response->get_error_message();
             return [];
         }
 
@@ -89,6 +93,7 @@ class GoogleAdsClient {
         $data = json_decode( (string) wp_remote_retrieve_body( $response ), true );
 
         if ( $code < 200 || $code >= 300 || ! is_array( $data ) ) {
+            $this->last_error = $data['error']['message'] ?? sprintf( __( 'Google Ads API HTTP %d hatası döndürdü.', 'hge' ), $code );
             return [];
         }
 
@@ -111,6 +116,13 @@ class GoogleAdsClient {
                 'competition'    => $competition,
                 'source'         => 'google_ads',
             ];
+
+            foreach ( (array) ( $row['closeVariants'] ?? [] ) as $variant ) {
+                $variant = sanitize_text_field( $variant );
+                if ( $variant !== '' ) {
+                    $metrics[ $variant ] = $metrics[ $keyword ];
+                }
+            }
         }
 
         set_transient( $cache_key, $metrics, 7 * DAY_IN_SECONDS );
@@ -123,9 +135,10 @@ class GoogleAdsClient {
             return new \WP_Error( 'hge_ads_not_configured', __( 'Google Ads API ayarları eksik.', 'hge' ) );
         }
 
-        $metrics = $this->get_keyword_metrics( [ 'maaş hesaplama' ] );
+        $metrics = $this->get_keyword_metrics( [ 'kredi hesaplama', 'faiz hesaplama', 'maaş hesaplama', 'hesaplama' ] );
         if ( empty( $metrics ) ) {
-            return new \WP_Error( 'hge_ads_empty_response', __( 'Google Ads API yanıt verdi ancak metrik döndürmedi. Developer token, customer ID veya hesap erişimini kontrol edin.', 'hge' ) );
+            $message = $this->last_error ?: __( 'Google Ads API yanıt verdi ancak metrik döndürmedi. Keyword Planner erişimi, hesap durumu veya developer token erişimini kontrol edin.', 'hge' );
+            return new \WP_Error( 'hge_ads_empty_response', $message );
         }
 
         update_option( 'hge_google_ads_last_test', [
