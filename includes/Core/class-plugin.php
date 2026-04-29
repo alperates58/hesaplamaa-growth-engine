@@ -50,8 +50,9 @@ final class Plugin {
         add_action( 'wp_ajax_hge_ai_keyword_insight',   [ $this, 'ajax_ai_keyword_insight' ] );
         add_action( 'wp_ajax_hge_ai_topic_ideas',       [ $this, 'ajax_ai_topic_ideas' ] );
 
-        // GSC OAuth redirect (admin_init üzerinden)
+        // OAuth redirect (admin_init üzerinden)
         add_action( 'admin_init', [ $this, 'handle_gsc_oauth_return' ] );
+        add_action( 'admin_init', [ $this, 'handle_ads_oauth_return' ] );
     }
 
     /**
@@ -253,6 +254,49 @@ final class Plugin {
         exit;
     }
 
+    public function handle_ads_oauth_return(){
+        if ( ! isset( $_GET['hge_ads_callback'], $_GET['code'] ) ) {
+            return;
+        }
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+
+        $code     = sanitize_text_field( wp_unslash( $_GET['code'] ) );
+        $settings = get_option( 'hge_settings', [] );
+
+        $response = wp_remote_post( 'https://oauth2.googleapis.com/token', [
+            'timeout' => 30,
+            'body'    => [
+                'code'          => $code,
+                'client_id'     => $settings['gsc_client_id'] ?? '',
+                'client_secret' => $settings['gsc_client_secret'] ?? '',
+                'redirect_uri'  => admin_url( '?hge_ads_callback=1' ),
+                'grant_type'    => 'authorization_code',
+            ],
+        ] );
+
+        if ( is_wp_error( $response ) ) {
+            add_settings_error( 'hge', 'ads_oauth_error', $response->get_error_message(), 'error' );
+        } else {
+            $body = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+
+            if ( ! empty( $body['error'] ) ) {
+                add_settings_error( 'hge', 'ads_oauth_error', $body['error_description'] ?? $body['error'], 'error' );
+            } elseif ( empty( $body['refresh_token'] ) ) {
+                add_settings_error( 'hge', 'ads_oauth_error', __( 'Refresh token alınamadı. Google izin ekranında erişimi kaldırıp tekrar deneyin.', 'hge' ), 'error' );
+            } else {
+                $settings['google_ads_refresh_token'] = sanitize_text_field( $body['refresh_token'] );
+                $settings['google_ads_enabled']       = true;
+                update_option( 'hge_settings', $settings );
+                add_settings_error( 'hge', 'ads_oauth_success', __( 'Google Ads başarıyla bağlandı.', 'hge' ), 'success' );
+            }
+        }
+
+        wp_safe_redirect( admin_url( 'admin.php?page=hge-settings' ) );
+        exit;
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -283,6 +327,28 @@ final class Plugin {
             'access_type'           => 'offline',
             'prompt'                => 'consent',
             'state'                 => wp_create_nonce( 'hge_gsc_state' ),
+        ];
+
+        return 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query( $params );
+    }
+
+    public function get_ads_auth_url(){
+        $settings     = get_option( 'hge_settings', [] );
+        $client_id    = $settings['gsc_client_id'] ?? '';
+        $redirect_uri = admin_url( '?hge_ads_callback=1' );
+
+        if ( empty( $client_id ) ) {
+            return '#';
+        }
+
+        $params = [
+            'client_id'             => $client_id,
+            'redirect_uri'          => $redirect_uri,
+            'response_type'         => 'code',
+            'scope'                 => 'https://www.googleapis.com/auth/adwords',
+            'access_type'           => 'offline',
+            'prompt'                => 'consent',
+            'state'                 => wp_create_nonce( 'hge_ads_state' ),
         ];
 
         return 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query( $params );

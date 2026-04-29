@@ -150,6 +150,7 @@
 
 .hge-btn-google    { background: #fff; color: #333; border-color: #ddd; font-weight: 600; }
 .hge-btn-google:hover { background: #f8f9fa; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.hge-ads-connect-btn { margin-top: 10px; justify-content: center; }
 
 .hge-btn:disabled, .hge-btn.loading {
     opacity: .6; cursor: not-allowed;

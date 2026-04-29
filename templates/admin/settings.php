@@ -197,6 +197,13 @@
                     <div class="hge-field">
                         <label for="hge_google_ads_refresh_token"><?php esc_html_e( 'Google Ads Refresh Token', 'hge' ); ?></label>
                         <input id="hge_google_ads_refresh_token" name="hge_settings[google_ads_refresh_token]" class="hge-input" type="password" value="<?php echo esc_attr( $settings['google_ads_refresh_token'] ?? '' ); ?>" autocomplete="off">
+                        <?php if ( ! empty( $settings['gsc_client_id'] ) && ! empty( $settings['gsc_client_secret'] ) ): ?>
+                            <a class="hge-btn hge-btn-google hge-ads-connect-btn" href="<?php echo esc_url( $ads_oauth_url ); ?>">
+                                <?php esc_html_e( 'Google Ads ile Bağlan', 'hge' ); ?>
+                            </a>
+                        <?php else: ?>
+                            <small class="hge-field-hint"><?php esc_html_e( 'Önce Google Client ID ve Client Secret alanlarını kaydedin.', 'hge' ); ?></small>
+                        <?php endif; ?>
                     </div>
                     <div class="hge-field">
                         <label for="hge_google_ads_language"><?php esc_html_e( 'Dil', 'hge' ); ?></label>
