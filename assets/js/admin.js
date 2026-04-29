@@ -251,18 +251,136 @@
     } );
 
     // -------------------------------------------------------------------------
-    // Tablo Filtreleme — Yeni Fikirler
+    // Tablo UX - Yeni Fikirler
     // -------------------------------------------------------------------------
-    $( '#hge-only-new' ).on( 'change', function () {
-        const onlyNew = $( this ).is( ':checked' );
-        $( '#hge-ideas-table tbody tr' ).each( function () {
-            const exists = parseInt( $( this ).data( 'exists' ), 10 );
-            if ( onlyNew ) {
-                $( this ).toggle( exists === 0 );
-            } else {
-                $( this ).show();
+    const ideasState = {
+        page: 1,
+        perPage: 12,
+    };
+
+    function getIdeaRows() {
+        return $( '#hge-ideas-table tbody tr' );
+    }
+
+    function applyIdeaFilters() {
+        const q         = ( $( '#hge-idea-search' ).val() || '' ).toString().toLowerCase();
+        const onlyNew   = $( '#hge-only-new' ).is( ':checked' );
+        const comp      = $( '#hge-comp-filter' ).val();
+        const minScore  = parseInt( $( '#hge-score-filter' ).val() || 0, 10 );
+        let visibleRows = [];
+
+        getIdeaRows().each( function () {
+            const $row       = $( this );
+            const keyword    = ( $row.data( 'keyword' ) || $row.text() ).toString().toLowerCase();
+            const exists     = parseInt( $row.data( 'exists' ), 10 ) === 1;
+            const rowComp    = ( $row.data( 'competition' ) || '' ).toString();
+            const score      = parseInt( $row.data( 'score' ) || 0, 10 );
+            const matches    = keyword.includes( q ) &&
+                ( ! onlyNew || ! exists ) &&
+                ( ! comp || rowComp === comp ) &&
+                ( ! minScore || score >= minScore );
+
+            $row.toggleClass( 'hge-filtered-out', ! matches );
+            if ( matches ) {
+                visibleRows.push( $row );
             }
         } );
+
+        const totalPages = Math.max( 1, Math.ceil( visibleRows.length / ideasState.perPage ) );
+        ideasState.page = Math.min( ideasState.page, totalPages );
+
+        const start = ( ideasState.page - 1 ) * ideasState.perPage;
+        const end   = start + ideasState.perPage;
+
+        getIdeaRows().hide();
+        visibleRows.slice( start, end ).forEach( $row => $row.show() );
+
+        $( '#hge-pagination-summary' ).text(
+            visibleRows.length
+                ? `${ start + 1 }-${ Math.min( end, visibleRows.length ) } / ${ visibleRows.length } fırsat gösteriliyor`
+                : 'Filtrelerle eşleşen fırsat yok'
+        );
+        $( '#hge-prev-page' ).prop( 'disabled', ideasState.page <= 1 );
+        $( '#hge-next-page' ).prop( 'disabled', ideasState.page >= totalPages );
+    }
+
+    $( '#hge-idea-search, #hge-comp-filter, #hge-score-filter, #hge-only-new' ).on( 'input change', function () {
+        ideasState.page = 1;
+        applyIdeaFilters();
+    } );
+
+    $( '#hge-toggle-filters' ).on( 'click', function () {
+        $( '#hge-idea-filters' ).toggleClass( 'is-open' );
+    } );
+
+    $( '#hge-prev-page' ).on( 'click', function () {
+        ideasState.page = Math.max( 1, ideasState.page - 1 );
+        applyIdeaFilters();
+    } );
+
+    $( '#hge-next-page' ).on( 'click', function () {
+        ideasState.page += 1;
+        applyIdeaFilters();
+    } );
+
+    $( '#hge-export-ideas' ).on( 'click', function () {
+        const rows = [ [ 'Anahtar Kelime', 'Aylık Hacim', 'Rekabet', 'Sitede Var mı', 'Fırsat Skoru' ] ];
+
+        getIdeaRows().not( '.hge-filtered-out' ).each( function () {
+            const cells = $( this ).find( 'td' );
+            rows.push( [
+                $( this ).data( 'keyword' ) || cells.eq( 0 ).text().trim(),
+                cells.eq( 1 ).text().trim(),
+                cells.eq( 2 ).text().trim(),
+                cells.eq( 3 ).text().trim(),
+                $( this ).data( 'score' ) || cells.eq( 4 ).text().trim(),
+            ] );
+        } );
+
+        const csv = rows.map( row => row.map( value => `"${ value.toString().replace( /"/g, '""' ) }"` ).join( ',' ) ).join( '\n' );
+        const blob = new Blob( [ '\ufeff' + csv ], { type: 'text/csv;charset=utf-8;' } );
+        const url = URL.createObjectURL( blob );
+        const a = document.createElement( 'a' );
+        a.href = url;
+        a.download = 'yeni-hesaplama-fikirleri.csv';
+        document.body.appendChild( a );
+        a.click();
+        document.body.removeChild( a );
+        URL.revokeObjectURL( url );
+    } );
+
+    function openIdeaPanel( row ) {
+        const $row       = $( row );
+        const keyword    = ( $row.data( 'keyword' ) || '' ).toString();
+        const score      = parseInt( $row.data( 'score' ) || 0, 10 );
+        const exists     = parseInt( $row.data( 'exists' ), 10 ) === 1;
+        const comp       = ( $row.data( 'competition' ) || 'UNKNOWN' ).toString();
+        const difficulty = comp === 'LOW' ? 'Düşük' : comp === 'MEDIUM' ? 'Orta' : comp === 'HIGH' ? 'Yüksek' : 'Veri bekleniyor';
+
+        $( '#hge-panel-title' ).text( keyword );
+        $( '#hge-panel-score' ).text( score );
+        $( '#hge-panel-content' ).text( `"${ keyword }" araması için niyet odaklı, kısa cevaplarla başlayan ve hesaplama örnekleriyle güçlenen bir içerik sayfası hazırlayın.` );
+        $( '#hge-panel-tool' ).text( `${ keyword } için kullanıcıdan temel değerleri alıp anında sonuç üreten, açıklamalı ve paylaşılabilir bir hesaplama modülü oluşturun.` );
+        $( '#hge-panel-difficulty' ).text( difficulty );
+        $( '#hge-panel-status' ).text( exists ? 'Sitede var' : 'Yeni fırsat' );
+        const $titles = $( '#hge-panel-titles' ).empty();
+        [
+            `${ keyword } nasıl hesaplanır?`,
+            `${ keyword } hesaplama aracı ve örnek sonuçlar`,
+            `${ keyword } için güncel formül ve pratik rehber`,
+        ].forEach( title => {
+            $( '<li />' ).text( title ).appendTo( $titles );
+        } );
+
+        $( '#hge-idea-panel' ).addClass( 'is-open' ).attr( 'aria-hidden', 'false' );
+    }
+
+    $( document ).on( 'click', '.hge-keyword-button, .hge-open-detail', function () {
+        openIdeaPanel( $( this ).closest( 'tr' ) );
+    } );
+
+    $( document ).on( 'click', '[data-close-panel]', function () {
+        $( '#hge-idea-panel' ).removeClass( 'is-open' ).attr( 'aria-hidden', 'true' );
     } );
 
     // -------------------------------------------------------------------------
@@ -309,6 +427,11 @@
             }
             return asc ? aVal.localeCompare( bVal, 'tr' ) : bVal.localeCompare( aVal, 'tr' );
         } ).appendTo( $tbody );
+
+        if ( $table.attr( 'id' ) === 'hge-ideas-table' ) {
+            ideasState.page = 1;
+            applyIdeaFilters();
+        }
     } );
 
     // -------------------------------------------------------------------------
@@ -316,6 +439,7 @@
     // -------------------------------------------------------------------------
     $( function () {
         initDashboardCharts();
+        applyIdeaFilters();
     } );
 
 } )( jQuery );
