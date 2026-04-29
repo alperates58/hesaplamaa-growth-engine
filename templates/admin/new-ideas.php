@@ -62,12 +62,20 @@
                         <td>
                             <?php
                             $comp     = $row['competition'];
-                            switch ( $comp ) { case 'HIGH':   $comp_cls = 'red'; break; case 'MEDIUM': $comp_cls = 'orange'; break; case 'LOW':    $comp_cls = 'green'; break; default:        $comp_cls = 'muted'; } // match_end
-                                'HIGH'   => 'red',
-                                'MEDIUM' => 'orange',
-                                'LOW'    => 'green',
-                                default  => 'muted',
-                            };
+                            switch ( $comp ) {
+                                case 'HIGH':
+                                    $comp_cls = 'red';
+                                    break;
+                                case 'MEDIUM':
+                                    $comp_cls = 'orange';
+                                    break;
+                                case 'LOW':
+                                    $comp_cls = 'green';
+                                    break;
+                                default:
+                                    $comp_cls = 'muted';
+                                    break;
+                            }
                             ?>
                             <span class="hge-comp-badge hge-comp-<?php echo esc_attr( $comp_cls ); ?>">
                                 <?php echo esc_html( ucfirst( strtolower( $comp ) ) ); ?>
