@@ -55,7 +55,7 @@ final class Plugin {
      */
     public function enqueue_admin_assets( string $hook ){
         // Sadece kendi sayfalarımızda yükle
-        if ( ! strpos( $hook, 'hge' ) !== false && ! strpos( $hook, 'hesaplamaa' ) !== false ) {
+        if ( strpos( $hook, 'hge' ) === false && strpos( $hook, 'hesaplamaa' ) === false ) {
             return;
         }
 
