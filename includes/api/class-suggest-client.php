@@ -178,6 +178,11 @@ class SuggestClient {
     }
 
     public function get_ai_metric_estimates( array $keywords ){
+        $ads_metrics = $this->get_google_ads_metrics( $keywords );
+        if ( ! empty( $ads_metrics ) ) {
+            return $ads_metrics;
+        }
+
         if ( ! class_exists( '\HGE\API\OpenAIClient' ) ) {
             return [];
         }
@@ -196,6 +201,24 @@ class SuggestClient {
                 continue;
             }
             $all_metrics = array_merge( $all_metrics, $metrics );
+        }
+
+        return $all_metrics;
+    }
+
+    public function get_google_ads_metrics( array $keywords ){
+        if ( ! class_exists( '\HGE\API\GoogleAdsClient' ) ) {
+            return [];
+        }
+
+        $client = new GoogleAdsClient();
+        $all_metrics = [];
+
+        foreach ( array_chunk( $keywords, 100 ) as $chunk ) {
+            $metrics = $client->get_keyword_metrics( $chunk );
+            if ( ! empty( $metrics ) && is_array( $metrics ) ) {
+                $all_metrics = array_merge( $all_metrics, $metrics );
+            }
         }
 
         return $all_metrics;

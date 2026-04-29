@@ -38,6 +38,7 @@ function hge_load_files() {
         // API
         'includes/api/class-gsc-client.php',
         'includes/api/class-suggest-client.php',
+        'includes/api/class-google-ads-client.php',
         'includes/api/class-openai-client.php',
         // Admin
         'includes/admin/class-menu.php',

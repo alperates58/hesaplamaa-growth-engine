@@ -30,6 +30,13 @@ class Settings {
         $clean['gsc_site_url']      = esc_url_raw( $input['gsc_site_url'] ?? get_site_url() );
         $clean['data_range_days']   = max( 7, min( 90, (int) ( $input['data_range_days'] ?? 30 ) ) );
         $clean['cache_ttl']         = max( 300, min( 86400, (int) ( $input['cache_ttl'] ?? 3600 ) ) );
+        $clean['google_ads_enabled']         = ! empty( $input['google_ads_enabled'] );
+        $clean['google_ads_developer_token'] = sanitize_text_field( $input['google_ads_developer_token'] ?? '' );
+        $clean['google_ads_customer_id']     = preg_replace( '/\D+/', '', (string) ( $input['google_ads_customer_id'] ?? '' ) );
+        $clean['google_ads_login_customer_id'] = preg_replace( '/\D+/', '', (string) ( $input['google_ads_login_customer_id'] ?? '' ) );
+        $clean['google_ads_refresh_token']   = sanitize_text_field( $input['google_ads_refresh_token'] ?? '' );
+        $clean['google_ads_language']        = sanitize_text_field( $input['google_ads_language'] ?? 'languageConstants/1055' );
+        $clean['google_ads_geo_target']      = sanitize_text_field( $input['google_ads_geo_target'] ?? 'geoTargetConstants/2792' );
 
         // Mevcut bağlantı durumunu koru
         $existing                  = get_option( self::OPTION_KEY, [] );

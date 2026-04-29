@@ -166,6 +166,56 @@
 
         </div><!-- .hge-settings-grid -->
 
+        <div class="hge-card">
+            <div class="hge-card-header">
+                <h3><?php esc_html_e( 'Google Ads API - Keyword Planner', 'hge' ); ?></h3>
+                <?php if ( ! empty( $settings['google_ads_enabled'] ) ): ?>
+                    <span class="hge-badge hge-badge-success"><?php esc_html_e( 'Aktif', 'hge' ); ?></span>
+                <?php else: ?>
+                    <span class="hge-badge hge-badge-warning"><?php esc_html_e( 'Pasif', 'hge' ); ?></span>
+                <?php endif; ?>
+            </div>
+            <div class="hge-card-body hge-form-fields">
+                <label class="hge-toggle-label">
+                    <input type="checkbox" name="hge_settings[google_ads_enabled]" value="1" <?php checked( ! empty( $settings['google_ads_enabled'] ) ); ?>>
+                    <?php esc_html_e( 'Google Ads API ile gerçek hacim ve rekabet verisi çek', 'hge' ); ?>
+                </label>
+
+                <div class="hge-settings-grid">
+                    <div class="hge-field">
+                        <label for="hge_google_ads_developer_token"><?php esc_html_e( 'Developer Token', 'hge' ); ?></label>
+                        <input id="hge_google_ads_developer_token" name="hge_settings[google_ads_developer_token]" class="hge-input" type="password" value="<?php echo esc_attr( $settings['google_ads_developer_token'] ?? '' ); ?>" autocomplete="off">
+                    </div>
+                    <div class="hge-field">
+                        <label for="hge_google_ads_customer_id"><?php esc_html_e( 'Customer ID', 'hge' ); ?></label>
+                        <input id="hge_google_ads_customer_id" name="hge_settings[google_ads_customer_id]" class="hge-input" type="text" value="<?php echo esc_attr( $settings['google_ads_customer_id'] ?? '' ); ?>" placeholder="1234567890">
+                    </div>
+                    <div class="hge-field">
+                        <label for="hge_google_ads_login_customer_id"><?php esc_html_e( 'Login Customer ID', 'hge' ); ?></label>
+                        <input id="hge_google_ads_login_customer_id" name="hge_settings[google_ads_login_customer_id]" class="hge-input" type="text" value="<?php echo esc_attr( $settings['google_ads_login_customer_id'] ?? '' ); ?>" placeholder="<?php esc_attr_e( 'MCC varsa doldurun', 'hge' ); ?>">
+                    </div>
+                    <div class="hge-field">
+                        <label for="hge_google_ads_refresh_token"><?php esc_html_e( 'Google Ads Refresh Token', 'hge' ); ?></label>
+                        <input id="hge_google_ads_refresh_token" name="hge_settings[google_ads_refresh_token]" class="hge-input" type="password" value="<?php echo esc_attr( $settings['google_ads_refresh_token'] ?? '' ); ?>" autocomplete="off">
+                    </div>
+                    <div class="hge-field">
+                        <label for="hge_google_ads_language"><?php esc_html_e( 'Dil', 'hge' ); ?></label>
+                        <input id="hge_google_ads_language" name="hge_settings[google_ads_language]" class="hge-input" type="text" value="<?php echo esc_attr( $settings['google_ads_language'] ?? 'languageConstants/1055' ); ?>">
+                        <small class="hge-field-hint"><?php esc_html_e( 'Varsayılan Türkçe: languageConstants/1055', 'hge' ); ?></small>
+                    </div>
+                    <div class="hge-field">
+                        <label for="hge_google_ads_geo_target"><?php esc_html_e( 'Lokasyon', 'hge' ); ?></label>
+                        <input id="hge_google_ads_geo_target" name="hge_settings[google_ads_geo_target]" class="hge-input" type="text" value="<?php echo esc_attr( $settings['google_ads_geo_target'] ?? 'geoTargetConstants/2792' ); ?>">
+                        <small class="hge-field-hint"><?php esc_html_e( 'Varsayılan Türkiye: geoTargetConstants/2792', 'hge' ); ?></small>
+                    </div>
+                </div>
+
+                <p class="hge-text-muted">
+                    <?php esc_html_e( 'Ads API verisi varsa AI/lokal tahminin yerine geçer. Refresh token adwords scope ile oluşturulmalıdır.', 'hge' ); ?>
+                </p>
+            </div>
+        </div>
+
         <div class="hge-form-actions">
             <?php submit_button( __( 'Ayarları Kaydet', 'hge' ), 'hge-btn hge-btn-primary', 'submit', false ); ?>
         </div>
