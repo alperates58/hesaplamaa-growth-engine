@@ -57,6 +57,7 @@ class Settings {
         $gsc_connected = $gsc_client->is_connected();
         $oauth_url     = \HGE\Core\Plugin::get_instance()->get_gsc_auth_url();
         $ads_oauth_url = \HGE\Core\Plugin::get_instance()->get_ads_auth_url();
+        $ads_last_test = get_option( 'hge_google_ads_last_test', [] );
 
         require HGE_DIR . 'templates/admin/settings.php';
     }

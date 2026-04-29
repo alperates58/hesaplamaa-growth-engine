@@ -118,6 +118,28 @@ class GoogleAdsClient {
         return $metrics;
     }
 
+    public function test_connection(){
+        if ( ! $this->is_configured() ) {
+            return new \WP_Error( 'hge_ads_not_configured', __( 'Google Ads API ayarları eksik.', 'hge' ) );
+        }
+
+        $metrics = $this->get_keyword_metrics( [ 'maaş hesaplama' ] );
+        if ( empty( $metrics ) ) {
+            return new \WP_Error( 'hge_ads_empty_response', __( 'Google Ads API yanıt verdi ancak metrik döndürmedi. Developer token, customer ID veya hesap erişimini kontrol edin.', 'hge' ) );
+        }
+
+        update_option( 'hge_google_ads_last_test', [
+            'ok'      => true,
+            'message' => __( 'Google Ads API bağlantısı başarılı.', 'hge' ),
+            'time'    => current_time( 'mysql' ),
+        ], false );
+
+        return [
+            'message' => __( 'Google Ads API bağlantısı başarılı.', 'hge' ),
+            'metrics' => $metrics,
+        ];
+    }
+
     private function get_access_token(){
         $cache_key = 'hge_google_ads_access_token';
         $cached    = get_transient( $cache_key );

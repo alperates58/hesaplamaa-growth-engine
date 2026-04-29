@@ -227,6 +227,26 @@
             .fail( () => $result.addClass( 'error' ).text( HGE.i18n.error ) );
     } );
 
+    $( '#hge-test-google-ads' ).on( 'click', function () {
+        const $result = $( '#hge-google-ads-test-result' );
+        $result.removeClass( 'success error' ).text( 'Google Ads API test ediliyor...' );
+
+        ajaxRequest( 'hge_test_google_ads', {}, this )
+            .done( res => {
+                if ( res.success ) {
+                    $result.addClass( 'success' ).text( res.data.message || 'Google Ads API bağlantısı başarılı.' );
+                } else {
+                    $result.addClass( 'error' ).text( res.data.message || HGE.i18n.error );
+                }
+            } )
+            .fail( xhr => {
+                const msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                    ? xhr.responseJSON.data.message
+                    : HGE.i18n.error;
+                $result.addClass( 'error' ).text( msg );
+            } );
+    } );
+
     // -------------------------------------------------------------------------
     // Tablo Filtreleme — Keyword Fırsatları
     // -------------------------------------------------------------------------

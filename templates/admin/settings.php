@@ -220,6 +220,19 @@
                 <p class="hge-text-muted">
                     <?php esc_html_e( 'Ads API verisi varsa AI/lokal tahminin yerine geçer. Refresh token adwords scope ile oluşturulmalıdır.', 'hge' ); ?>
                 </p>
+
+                <div class="hge-ads-test-row">
+                    <button class="hge-btn hge-btn-secondary" id="hge-test-google-ads" type="button">
+                        <?php esc_html_e( 'Google Ads Bağlantısını Test Et', 'hge' ); ?>
+                    </button>
+                    <span id="hge-google-ads-test-result" class="hge-inline-result <?php echo ! empty( $ads_last_test['ok'] ) ? 'success' : ( ! empty( $ads_last_test ) ? 'error' : '' ); ?>">
+                        <?php
+                        if ( ! empty( $ads_last_test['message'] ) ) {
+                            echo esc_html( $ads_last_test['message'] . ' ' . ( $ads_last_test['time'] ?? '' ) );
+                        }
+                        ?>
+                    </span>
+                </div>
             </div>
         </div>
 
