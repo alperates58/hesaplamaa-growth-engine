@@ -384,6 +384,121 @@
     } );
 
     // -------------------------------------------------------------------------
+    // Yeni Fikirler - kart liste ve detay paneli
+    // -------------------------------------------------------------------------
+    function initIdeasWorkspace() {
+        const $list = $( '#hge-ideas-list' );
+        if ( ! $list.length ) return;
+
+        ideasState.visibleLimit = 12;
+        ideasState.segment = 'all';
+
+        function cards() {
+            return $list.find( '.hge-idea-card' );
+        }
+
+        function filteredCards() {
+            const q = ( $( '#hge-idea-search' ).val() || '' ).toString().toLowerCase();
+            return cards().filter( function () {
+                const $card   = $( this );
+                const keyword = ( $card.data( 'keyword' ) || '' ).toString().toLowerCase();
+                const exists  = parseInt( $card.data( 'exists' ), 10 ) === 1;
+                const quick   = parseInt( $card.data( 'quick' ), 10 ) === 1;
+
+                if ( q && ! keyword.includes( q ) ) return false;
+                if ( ideasState.segment === 'missing' && exists ) return false;
+                if ( ideasState.segment === 'quick' && ! quick ) return false;
+                return true;
+            } );
+        }
+
+        function selectCard( card ) {
+            const $card      = $( card );
+            const keyword    = ( $card.data( 'keyword' ) || '' ).toString();
+            const score      = parseInt( $card.data( 'score' ) || 0, 10 );
+            const volume     = parseInt( $card.data( 'volume' ) || 0, 10 );
+            const exists     = parseInt( $card.data( 'exists' ), 10 ) === 1;
+            const comp       = ( $card.data( 'competition' ) || 'UNKNOWN' ).toString();
+            const compLabel  = ( $card.data( 'competition-label' ) || 'Bilinmiyor' ).toString();
+            const difficulty = comp === 'LOW' ? 'Düşük' : comp === 'MEDIUM' ? 'Orta' : comp === 'HIGH' ? 'Yüksek' : 'Veri bekleniyor';
+            const actionType = exists ? 'İçeriği güçlendir' : score >= 75 ? 'Hesaplama aracı aç' : 'İçerik planla';
+
+            cards().removeClass( 'is-selected' );
+            $card.addClass( 'is-selected' );
+
+            $( '#hge-detail-title' ).text( keyword );
+            $( '#hge-detail-score' ).text( score );
+            $( '#hge-detail-difficulty' ).text( difficulty );
+            $( '#hge-detail-action-type' ).text( actionType );
+            $( '#hge-detail-why' ).text(
+                exists
+                    ? `"${ keyword }" zaten sitede var. Skor, mevcut sayfanın daha iyi başlık, hesaplama örneği ve iç linklerle büyütülebileceğini gösteriyor.`
+                    : `"${ keyword }" için sitede karşılık yok. Bu boşluk yeni organik trafik ve dönüşüm odaklı hesaplama sayfası fırsatı yaratıyor.`
+            );
+            $( '#hge-detail-competitors' ).text(
+                comp === 'UNKNOWN'
+                    ? 'Rekabet verisi henüz netleşmedi. Google sonuçları tarandıktan sonra öncelik tekrar değerlendirilmeli.'
+                    : `${ compLabel } rekabet sinyali var. ${ volume > 0 ? 'Aranma hacmi de karar sürecine dahil edilmeli.' : 'Hacim verisi gelene kadar fırsat skoru öncelikli okunmalı.' }`
+            );
+            $( '#hge-detail-recommendation' ).text(
+                score >= 75 && ! exists
+                    ? 'Öncelik hesaplama aracı olmalı. Kısa açıklama, formül, örnek sonuç ve SSS bloğu ile yayınlanabilir.'
+                    : 'Önce içerik iskeleti hazırlanmalı. Arama niyeti doğrulandıktan sonra hesaplama modülü eklenebilir.'
+            );
+        }
+
+        function renderCards() {
+            const $cards   = cards();
+            const filtered = filteredCards();
+            const count    = Math.min( filtered.length, ideasState.visibleLimit );
+
+            $cards.hide().removeClass( 'hge-filtered-out' );
+            $cards.not( filtered ).addClass( 'hge-filtered-out' );
+            filtered.each( function ( index ) {
+                $( this ).toggle( index < ideasState.visibleLimit );
+            } );
+
+            $( '#hge-ideas-count' ).text(
+                filtered.length
+                    ? `${ count } / ${ filtered.length } fırsat gösteriliyor`
+                    : 'Bu filtrede fırsat yok'
+            );
+            $( '#hge-load-more-ideas' ).prop( 'disabled', count >= filtered.length );
+
+            if ( filtered.length && ! filtered.filter( '.is-selected' ).length ) {
+                selectCard( filtered.first() );
+            }
+        }
+
+        $( '#hge-idea-search' ).off( '.hgeIdeas' ).on( 'input.hgeIdeas', function () {
+            ideasState.visibleLimit = 12;
+            renderCards();
+        } );
+
+        $( document ).off( 'click.hgeIdeasSegment' ).on( 'click.hgeIdeasSegment', '[data-idea-segment]', function () {
+            ideasState.segment = $( this ).data( 'idea-segment' );
+            ideasState.visibleLimit = 12;
+            $( '[data-idea-segment]' ).removeClass( 'is-active' );
+            $( this ).addClass( 'is-active' );
+            renderCards();
+        } );
+
+        $( '#hge-load-more-ideas' ).off( '.hgeIdeas' ).on( 'click.hgeIdeas', function () {
+            ideasState.visibleLimit += 12;
+            renderCards();
+        } );
+
+        $( document ).off( 'click.hgeIdeasCard keydown.hgeIdeasCard' ).on( 'click.hgeIdeasCard keydown.hgeIdeasCard', '.hge-idea-card', function ( event ) {
+            if ( event.type === 'keydown' && event.key !== 'Enter' && event.key !== ' ' ) return;
+            event.preventDefault();
+            selectCard( this );
+        } );
+
+        renderCards();
+        selectCard( cards().filter( '.is-selected' ).first().length ? cards().filter( '.is-selected' ).first() : cards().first() );
+    }
+
+    // -------------------------------------------------------------------------
     // Tablo Filtreleme — Sayfa Analizi
     // -------------------------------------------------------------------------
     $( '#hge-page-search' ).on( 'input', function () {
@@ -440,6 +555,7 @@
     $( function () {
         initDashboardCharts();
         applyIdeaFilters();
+        initIdeasWorkspace();
     } );
 
 } )( jQuery );
