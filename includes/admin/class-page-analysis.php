@@ -27,7 +27,7 @@ class PageAnalysis {
             $url  = $wp_page['url'];
             $base = $db_indexed[ $url ] ?? [];
 
-            $result[] = array_merge(
+            $merged = array_merge(
                 [
                     'page_url'      => $url,
                     'page_title'    => $wp_page['title'],
@@ -44,6 +44,12 @@ class PageAnalysis {
                 ],
                 $base
             );
+
+            if ( empty( $merged['page_title'] ) ) {
+                $merged['page_title'] = $wp_page['title'] ?: $this->title_from_url( $url );
+            }
+
+            $result[] = $merged;
         }
 
         // Tıklama'ya göre sırala
@@ -82,6 +88,17 @@ class PageAnalysis {
         $site_url = get_site_url();
         preg_match_all( '/<a[^>]+href=["\'](' . preg_quote( $site_url, '/' ) . '[^"\']*)["\'][^>]*>/i', $content, $matches );
         return count( $matches[1] ?? [] );
+    }
+
+    private function title_from_url( string $url ){
+        $path = trim( (string) wp_parse_url( $url, PHP_URL_PATH ), '/' );
+        if ( $path === '' ) {
+            return __( 'Ana Sayfa', 'hge' );
+        }
+
+        $parts = explode( '/', $path );
+        $slug  = end( $parts );
+        return ucwords( str_replace( '-', ' ', sanitize_title( $slug ) ) );
     }
 
     public function render(){

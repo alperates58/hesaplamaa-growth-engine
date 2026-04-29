@@ -267,7 +267,15 @@ class Repository {
         return $this->wpdb->get_results(
             $this->wpdb->prepare(
                 "SELECT * FROM {$this->suggestions}
-                 ORDER BY opportunity_score DESC, monthly_volume DESC
+                 ORDER BY
+                    CASE
+                        WHEN source = 'ai_topic' THEN 0
+                        WHEN source = 'ai_seed_google_suggest' THEN 1
+                        ELSE 2
+                    END ASC,
+                    opportunity_score DESC,
+                    monthly_volume DESC,
+                    id DESC
                  LIMIT %d",
                 $limit
             ),
