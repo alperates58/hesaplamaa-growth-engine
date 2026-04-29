@@ -560,6 +560,29 @@ input[type="submit"].hge-btn { height: auto; padding: 10px 24px; }
     padding: 28px 32px 48px;
 }
 
+.hge-new-ideas-page svg {
+    display: inline-block !important;
+    width: 16px !important;
+    height: 16px !important;
+    max-width: 16px !important;
+    max-height: 16px !important;
+    flex: 0 0 auto;
+}
+
+.hge-new-ideas-page .hge-kpi-icon svg {
+    width: 20px !important;
+    height: 20px !important;
+    max-width: 20px !important;
+    max-height: 20px !important;
+}
+
+.hge-new-ideas-page .hge-empty-state svg {
+    width: 48px !important;
+    height: 48px !important;
+    max-width: 48px !important;
+    max-height: 48px !important;
+}
+
 .hge-new-ideas-page .hge-hero {
     display: flex;
     align-items: flex-start;

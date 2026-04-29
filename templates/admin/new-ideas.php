@@ -34,15 +34,15 @@ if ( $today_count === 0 && $total_count > 0 ) {
         </div>
         <div class="hge-header-actions">
             <button class="hge-btn hge-btn-secondary" id="hge-refresh-suggestions" type="button">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 1-15.2 6.5"/><path d="M3 12A9 9 0 0 1 18.2 5.5"/><path d="M21 4v6h-6"/><path d="M3 20v-6h6"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 1-15.2 6.5"/><path d="M3 12A9 9 0 0 1 18.2 5.5"/><path d="M21 4v6h-6"/><path d="M3 20v-6h6"/></svg>
                 <?php esc_html_e( 'Yenile', 'hge' ); ?>
             </button>
             <button class="hge-btn hge-btn-secondary" id="hge-export-ideas" type="button">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
                 <?php esc_html_e( 'Excel indir', 'hge' ); ?>
             </button>
             <button class="hge-btn hge-btn-primary" id="hge-toggle-filters" type="button">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/></svg>
                 <?php esc_html_e( 'Filtreler', 'hge' ); ?>
             </button>
         </div>
@@ -50,7 +50,7 @@ if ( $today_count === 0 && $total_count > 0 ) {
 
     <div class="hge-kpi-grid hge-ideas-kpis">
         <div class="hge-kpi-card hge-kpi-blue">
-            <div class="hge-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-7"/></svg></div>
+            <div class="hge-kpi-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-7"/></svg></div>
             <div class="hge-kpi-body">
                 <span class="hge-kpi-label"><?php esc_html_e( 'Toplam Fırsat', 'hge' ); ?></span>
                 <strong class="hge-kpi-value"><?php echo esc_html( number_format_i18n( $total_count ) ); ?></strong>
@@ -58,7 +58,7 @@ if ( $today_count === 0 && $total_count > 0 ) {
             </div>
         </div>
         <div class="hge-kpi-card hge-kpi-orange">
-            <div class="hge-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg></div>
+            <div class="hge-kpi-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg></div>
             <div class="hge-kpi-body">
                 <span class="hge-kpi-label"><?php esc_html_e( 'Sitede Olmayanlar', 'hge' ); ?></span>
                 <strong class="hge-kpi-value"><?php echo esc_html( number_format_i18n( $missing_count ) ); ?></strong>
@@ -66,7 +66,7 @@ if ( $today_count === 0 && $total_count > 0 ) {
             </div>
         </div>
         <div class="hge-kpi-card hge-kpi-green">
-            <div class="hge-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.8 6.8L22 9.3l-5.5 4.7 1.7 7-6.2-3.7L5.8 21l1.7-7L2 9.3l7.2-.5L12 2z"/></svg></div>
+            <div class="hge-kpi-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.8 6.8L22 9.3l-5.5 4.7 1.7 7-6.2-3.7L5.8 21l1.7-7L2 9.3l7.2-.5L12 2z"/></svg></div>
             <div class="hge-kpi-body">
                 <span class="hge-kpi-label"><?php esc_html_e( 'Yüksek Potansiyel', 'hge' ); ?></span>
                 <strong class="hge-kpi-value"><?php echo esc_html( number_format_i18n( $high_potential_count ) ); ?></strong>
@@ -74,7 +74,7 @@ if ( $today_count === 0 && $total_count > 0 ) {
             </div>
         </div>
         <div class="hge-kpi-card hge-kpi-red">
-            <div class="hge-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/></svg></div>
+            <div class="hge-kpi-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/></svg></div>
             <div class="hge-kpi-body">
                 <span class="hge-kpi-label"><?php esc_html_e( 'Bugün Yeni Gelenler', 'hge' ); ?></span>
                 <strong class="hge-kpi-value"><?php echo esc_html( number_format_i18n( $today_count ) ); ?></strong>
@@ -90,7 +90,7 @@ if ( $today_count === 0 && $total_count > 0 ) {
                 <p><?php esc_html_e( 'Önceliklendirilmiş hesaplama aracı ve içerik fırsatları', 'hge' ); ?></p>
             </div>
             <div class="hge-search">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
                 <input type="search" id="hge-idea-search" placeholder="<?php esc_attr_e( 'Anahtar kelime ara...', 'hge' ); ?>">
             </div>
         </div>
@@ -117,7 +117,7 @@ if ( $today_count === 0 && $total_count > 0 ) {
         <div class="hge-card-body hge-table-wrap">
             <?php if ( empty( $suggestions ) ): ?>
                 <div class="hge-empty-state">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
                     <p><?php esc_html_e( 'Henüz öneri yok. Yenile butonuna basarak Google Suggest verilerini çekin.', 'hge' ); ?></p>
                 </div>
             <?php else: ?>
