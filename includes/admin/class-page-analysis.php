@@ -15,17 +15,25 @@ class PageAnalysis {
      * WordPress sayfalarını tara ve GSC verisiyle zenginleştir
      */
     public function get_enriched_pages(){
-        $db_pages   = $this->repo->get_all_page_stats( 300 );
+        $db_pages   = $this->repo->get_all_page_stats( 1000 );
         $wp_pages   = $this->get_wp_pages();
         $db_indexed = [];
         foreach ( $db_pages as $p ) {
-            $db_indexed[ $p['page_url'] ] = $p;
+            foreach ( $this->url_keys( $p['page_url'] ) as $key ) {
+                $db_indexed[ $key ] = $p;
+            }
         }
 
         $result = [];
         foreach ( $wp_pages as $wp_page ) {
             $url  = $wp_page['url'];
-            $base = $db_indexed[ $url ] ?? [];
+            $base = [];
+            foreach ( $this->url_keys( $url ) as $key ) {
+                if ( isset( $db_indexed[ $key ] ) ) {
+                    $base = $db_indexed[ $key ];
+                    break;
+                }
+            }
 
             $merged = array_merge(
                 [
@@ -88,6 +96,25 @@ class PageAnalysis {
         $site_url = get_site_url();
         preg_match_all( '/<a[^>]+href=["\'](' . preg_quote( $site_url, '/' ) . '[^"\']*)["\'][^>]*>/i', $content, $matches );
         return count( $matches[1] ?? [] );
+    }
+
+    private function url_keys( string $url ){
+        $url = trim( $url );
+        if ( $url === '' ) {
+            return [];
+        }
+
+        $keys   = [];
+        $keys[] = untrailingslashit( $url );
+
+        $parts = wp_parse_url( $url );
+        if ( ! empty( $parts['host'] ) ) {
+            $host = preg_replace( '/^www\./i', '', strtolower( $parts['host'] ) );
+            $path = '/' . ltrim( $parts['path'] ?? '', '/' );
+            $keys[] = $host . untrailingslashit( $path );
+        }
+
+        return array_values( array_unique( array_filter( $keys ) ) );
     }
 
     private function title_from_url( string $url ){

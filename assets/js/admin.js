@@ -265,9 +265,11 @@
         $( '#hge-opp-table tbody tr' ).each( function () {
             const pos = parseFloat( $( this ).data( 'position' ) || 0 );
             let show = true;
-            if      ( val === '4-10'  ) show = pos >= 4  && pos <= 10;
+            if      ( val === '1-3'   ) show = pos > 0   && pos <= 3;
+            else if ( val === '4-10'  ) show = pos >= 4  && pos <= 10;
             else if ( val === '11-20' ) show = pos > 10  && pos <= 20;
             else if ( val === '21-30' ) show = pos > 20  && pos <= 30;
+            else if ( val === '31+'   ) show = pos > 30;
             $( this ).toggle( show );
         } );
     } );
@@ -623,6 +625,66 @@
             if ( val === '' ) { $( this ).show(); return; }
             $( this ).toggle( $( this ).data( 'meta' ).toString() === val );
         } );
+    } );
+
+    // -------------------------------------------------------------------------
+    // Dizin Durumlari
+    // -------------------------------------------------------------------------
+    function applyIndexFilters() {
+        const q = ( $( '#hge-index-search' ).val() || '' ).toString().toLowerCase();
+        const state = $( '#hge-index-filter' ).val();
+
+        $( '#hge-index-table tbody tr' ).each( function () {
+            const $row = $( this );
+            const matchesText = $row.text().toLowerCase().includes( q );
+            const matchesState = ! state || $row.data( 'index-state' ) === state;
+            $row.toggle( matchesText && matchesState );
+        } );
+    }
+
+    $( '#hge-index-search, #hge-index-filter' ).on( 'input change', applyIndexFilters );
+
+    $( document ).on( 'click', '.hge-index-check', function () {
+        const $row = $( this ).closest( 'tr' );
+        const postId = parseInt( $row.data( 'post-id' ), 10 );
+
+        ajaxRequest( 'hge_inspect_index_status', { post_id: postId }, this )
+            .done( res => {
+                if ( res.success ) {
+                    const data = res.data || {};
+                    const indexed = data.verdict === 'PASS';
+                    const state = indexed ? 'indexed' : 'not-indexed';
+                    $row.attr( 'data-index-state', state ).data( 'index-state', state );
+                    $row.find( '.hge-index-badge' )
+                        .removeClass( 'hge-index-indexed hge-index-not-indexed hge-index-pending hge-index-error' )
+                        .addClass( indexed ? 'hge-index-indexed' : 'hge-index-not-indexed' )
+                        .text( indexed ? 'İndekste' : 'İndekste Değil' );
+                    $row.find( '.hge-index-coverage' ).text( data.coverage_state || data.error_message || '-' );
+                    $row.find( '.hge-index-checked' ).text( data.last_checked || '-' );
+                    toast( 'Dizin durumu güncellendi.', 'success' );
+                } else {
+                    toast( res.data.message || HGE.i18n.error, 'error' );
+                }
+            } )
+            .fail( xhr => {
+                const msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                    ? xhr.responseJSON.data.message
+                    : HGE.i18n.error;
+                toast( msg, 'error' );
+            } );
+    } );
+
+    $( '#hge-index-batch' ).on( 'click', function () {
+        ajaxRequest( 'hge_inspect_index_batch', { limit: 5 }, this )
+            .done( res => {
+                if ( res.success ) {
+                    toast( res.data.message || 'URL kontrolü tamamlandı.', 'success' );
+                    setTimeout( () => location.reload(), 1200 );
+                } else {
+                    toast( res.data.message || HGE.i18n.error, 'error' );
+                }
+            } )
+            .fail( () => toast( HGE.i18n.error, 'error' ) );
     } );
 
     // -------------------------------------------------------------------------

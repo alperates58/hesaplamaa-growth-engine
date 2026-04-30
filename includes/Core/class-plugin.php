@@ -50,6 +50,11 @@ final class Plugin {
         add_action( 'wp_ajax_hge_ai_keyword_insight',   [ $this, 'ajax_ai_keyword_insight' ] );
         add_action( 'wp_ajax_hge_ai_topic_ideas',       [ $this, 'ajax_ai_topic_ideas' ] );
         add_action( 'wp_ajax_hge_test_google_ads',      [ $this, 'ajax_test_google_ads' ] );
+        add_action( 'wp_ajax_hge_inspect_index_status', [ $this, 'ajax_inspect_index_status' ] );
+        add_action( 'wp_ajax_hge_inspect_index_batch',  [ $this, 'ajax_inspect_index_batch' ] );
+
+        add_action( 'transition_post_status', [ $this, 'queue_post_for_index_check' ], 10, 3 );
+        add_action( 'save_post', [ $this, 'queue_saved_post_for_index_check' ], 10, 3 );
 
         // OAuth redirect (admin_init üzerinden)
         add_action( 'admin_init', [ $this, 'handle_gsc_oauth_return' ] );
@@ -244,6 +249,53 @@ final class Plugin {
         }
 
         wp_send_json_success( $result );
+    }
+
+    public function ajax_inspect_index_status(){
+        $this->verify_ajax_request();
+
+        $post_id = (int) ( $_POST['post_id'] ?? 0 );
+        $service = new \HGE\Admin\IndexStatus();
+        $result  = $service->inspect_post( $post_id );
+
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( [ 'message' => $result->get_error_message() ], 500 );
+        }
+
+        wp_send_json_success( $result );
+    }
+
+    public function ajax_inspect_index_batch(){
+        $this->verify_ajax_request();
+
+        $limit   = (int) ( $_POST['limit'] ?? 5 );
+        $service = new \HGE\Admin\IndexStatus();
+        $result  = $service->inspect_pending( $limit );
+
+        wp_send_json_success( [
+            'message' => sprintf( __( '%d URL kontrol edildi.', 'hge' ), count( $result ) ),
+            'items'   => $result,
+        ] );
+    }
+
+    public function queue_post_for_index_check( string $new_status, string $old_status, \WP_Post $post ){
+        if ( $new_status !== 'publish' || $old_status === 'publish' ) {
+            return;
+        }
+
+        ( new \HGE\Admin\IndexStatus() )->queue_published_post( $post->ID );
+    }
+
+    public function queue_saved_post_for_index_check( int $post_id, \WP_Post $post, bool $update ){
+        if ( wp_is_post_autosave( $post_id ) || wp_is_post_revision( $post_id ) ) {
+            return;
+        }
+
+        if ( ! $update || $post->post_status !== 'publish' || ! in_array( $post->post_type, [ 'post', 'page' ], true ) ) {
+            return;
+        }
+
+        ( new \HGE\Admin\IndexStatus() )->queue_published_post( $post_id );
     }
 
     /**

@@ -10,7 +10,7 @@ defined( 'ABSPATH' ) || exit;
 class Migrator {
 
     const DB_VERSION_OPTION = 'hge_db_version';
-    const DB_VERSION        = '1.1.0';
+    const DB_VERSION        = '1.2.0';
 
     public static function maybe_run(){
         if ( get_option( self::DB_VERSION_OPTION ) !== self::DB_VERSION ) {
@@ -106,6 +106,33 @@ class Migrator {
             KEY model_idx (model)
         ) $charset_collate;";
 
+        // ---- wp_hge_index_status -------------------------------------------
+        $sql[] = "CREATE TABLE {$wpdb->prefix}hge_index_status (
+            id               BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            url_hash         CHAR(32)            NOT NULL,
+            page_url         VARCHAR(2083)       NOT NULL,
+            page_title       VARCHAR(500)        NOT NULL DEFAULT '',
+            post_id          BIGINT(20)          NOT NULL DEFAULT 0,
+            verdict          VARCHAR(30)         NOT NULL DEFAULT '',
+            coverage_state   VARCHAR(255)        NOT NULL DEFAULT '',
+            robots_txt_state VARCHAR(50)         NOT NULL DEFAULT '',
+            indexing_state   VARCHAR(80)         NOT NULL DEFAULT '',
+            page_fetch_state VARCHAR(80)         NOT NULL DEFAULT '',
+            google_canonical VARCHAR(2083)       NOT NULL DEFAULT '',
+            user_canonical   VARCHAR(2083)       NOT NULL DEFAULT '',
+            crawled_as       VARCHAR(30)         NOT NULL DEFAULT '',
+            last_crawl_time  DATETIME            NULL DEFAULT NULL,
+            inspection_link  VARCHAR(2083)       NOT NULL DEFAULT '',
+            error_message    TEXT                NULL,
+            last_checked     DATETIME            NULL DEFAULT NULL,
+            created_at       DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY url_hash_idx (url_hash),
+            KEY post_id_idx (post_id),
+            KEY verdict_idx (verdict),
+            KEY checked_idx (last_checked)
+        ) $charset_collate;";
+
         // ---- wp_hge_settings ------------------------------------------------
         $sql[] = "CREATE TABLE {$wpdb->prefix}hge_settings (
             id          INT(11)      NOT NULL AUTO_INCREMENT,
@@ -134,6 +161,7 @@ class Migrator {
             $wpdb->prefix . 'hge_page_stats',
             $wpdb->prefix . 'hge_suggestions',
             $wpdb->prefix . 'hge_ai_insights',
+            $wpdb->prefix . 'hge_index_status',
             $wpdb->prefix . 'hge_settings',
         ];
         foreach ( $tables as $table ) {

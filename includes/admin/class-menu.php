@@ -49,6 +49,13 @@ class Menu {
             ],
             [
                 'parent' => 'hge-dashboard',
+                'title'  => __( 'Dizin Durumları', 'hge' ),
+                'menu'   => __( 'Dizin Durumları', 'hge' ),
+                'slug'   => 'hge-index-status',
+                'cb'     => [ $this, 'render_index_status' ],
+            ],
+            [
+                'parent' => 'hge-dashboard',
                 'title'  => __( 'Yeni Hesaplama Fikirleri', 'hge' ),
                 'menu'   => __( 'Yeni Fikirler', 'hge' ),
                 'slug'   => 'hge-new-ideas',
@@ -106,6 +113,10 @@ class Menu {
 
     public function render_page_analysis(){
         ( new PageAnalysis() )->render();
+    }
+
+    public function render_index_status(){
+        ( new IndexStatus() )->render();
     }
 
     public function render_new_ideas(){

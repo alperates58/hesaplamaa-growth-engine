@@ -1,0 +1,186 @@
+<?php
+namespace HGE\Admin;
+
+defined( 'ABSPATH' ) || exit;
+
+class IndexStatus {
+
+    private \HGE\DB\Repository $repo;
+
+    public function __construct() {
+        $this->repo = new \HGE\DB\Repository();
+    }
+
+    public function get_data(){
+        $status_map = $this->repo->get_index_status_map();
+        $rows       = [];
+
+        foreach ( $this->get_public_posts() as $post ) {
+            $url    = get_permalink( $post->ID );
+            $status = $status_map[ 'post:' . $post->ID ] ?? $status_map[ $url ] ?? [];
+
+            $rows[] = array_merge(
+                [
+                    'post_id'          => $post->ID,
+                    'page_url'         => $url,
+                    'page_title'       => get_the_title( $post->ID ) ?: '(Başlıksız)',
+                    'verdict'          => '',
+                    'coverage_state'   => '',
+                    'robots_txt_state' => '',
+                    'indexing_state'   => '',
+                    'page_fetch_state' => '',
+                    'last_crawl_time'  => '',
+                    'last_checked'     => '',
+                    'inspection_link'  => '',
+                    'error_message'    => '',
+                ],
+                $status
+            );
+        }
+
+        usort(
+            $rows,
+            static fn( $a, $b ) => strcmp( (string) ( $a['last_checked'] ?? '' ), (string) ( $b['last_checked'] ?? '' ) )
+        );
+
+        return $rows;
+    }
+
+    public function get_summary( array $rows ){
+        $summary = [
+            'total'      => count( $rows ),
+            'indexed'    => 0,
+            'not_indexed'=> 0,
+            'pending'    => 0,
+            'errors'     => 0,
+        ];
+
+        foreach ( $rows as $row ) {
+            if ( ! empty( $row['error_message'] ) ) {
+                $summary['errors']++;
+            } elseif ( empty( $row['last_checked'] ) ) {
+                $summary['pending']++;
+            } elseif ( ( $row['verdict'] ?? '' ) === 'PASS' ) {
+                $summary['indexed']++;
+            } else {
+                $summary['not_indexed']++;
+            }
+        }
+
+        return $summary;
+    }
+
+    public function inspect_post( int $post_id ){
+        $post = get_post( $post_id );
+        if ( ! $post || $post->post_status !== 'publish' ) {
+            return new \WP_Error( 'hge_invalid_post', __( 'Yayınlanmış sayfa bulunamadı.', 'hge' ) );
+        }
+
+        return $this->inspect_url( get_permalink( $post_id ), get_the_title( $post_id ), $post_id );
+    }
+
+    public function inspect_url( string $url, string $title = '', int $post_id = 0 ){
+        $settings = get_option( 'hge_settings', [] );
+        $site_url = $settings['gsc_site_url'] ?? get_site_url();
+        $client   = new \HGE\API\GSCClient();
+
+        if ( ! $client->is_connected() ) {
+            return new \WP_Error( 'hge_gsc_not_connected', __( 'GSC bağlı değil.', 'hge' ) );
+        }
+
+        $result = $client->inspect_url( $site_url, $url, 'tr-TR' );
+        if ( is_wp_error( $result ) ) {
+            $this->repo->upsert_index_status( [
+                'page_url'      => $url,
+                'page_title'    => $title,
+                'post_id'       => $post_id,
+                'error_message' => $result->get_error_message(),
+            ] );
+            return $result;
+        }
+
+        $index = $result['indexStatusResult'] ?? [];
+        $this->repo->upsert_index_status( [
+            'page_url'         => $url,
+            'page_title'       => $title,
+            'post_id'          => $post_id,
+            'verdict'          => $index['verdict'] ?? '',
+            'coverage_state'   => $index['coverageState'] ?? '',
+            'robots_txt_state' => $index['robotsTxtState'] ?? '',
+            'indexing_state'   => $index['indexingState'] ?? '',
+            'page_fetch_state' => $index['pageFetchState'] ?? '',
+            'google_canonical' => $index['googleCanonical'] ?? '',
+            'user_canonical'   => $index['userCanonical'] ?? '',
+            'crawled_as'       => $index['crawledAs'] ?? '',
+            'last_crawl_time'  => $index['lastCrawlTime'] ?? '',
+            'inspection_link'  => $result['inspectionResultLink'] ?? '',
+            'error_message'    => '',
+        ] );
+
+        return $this->format_row_for_response( $this->repo->get_index_status_map()[ $url ] ?? [] );
+    }
+
+    public function inspect_pending( int $limit = 5 ){
+        $rows    = $this->get_data();
+        $checked = [];
+        $limit   = max( 1, min( 10, $limit ) );
+
+        foreach ( $rows as $row ) {
+            if ( count( $checked ) >= $limit ) {
+                break;
+            }
+
+            if ( ! empty( $row['last_checked'] ) && ( $row['verdict'] ?? '' ) === 'PASS' ) {
+                continue;
+            }
+
+            $result = $this->inspect_url( $row['page_url'], $row['page_title'], (int) $row['post_id'] );
+            $checked[] = [
+                'url' => $row['page_url'],
+                'ok'  => ! is_wp_error( $result ),
+                'msg' => is_wp_error( $result ) ? $result->get_error_message() : 'OK',
+            ];
+        }
+
+        return $checked;
+    }
+
+    public function queue_published_post( int $post_id ){
+        $post = get_post( $post_id );
+        if ( ! $post || $post->post_status !== 'publish' || ! in_array( $post->post_type, [ 'post', 'page' ], true ) ) {
+            return;
+        }
+
+        $this->repo->queue_index_status_url( get_permalink( $post_id ), get_the_title( $post_id ), $post_id );
+    }
+
+    private function get_public_posts(){
+        return get_posts( [
+            'post_type'      => [ 'page', 'post' ],
+            'post_status'    => 'publish',
+            'posts_per_page' => 500,
+            'orderby'        => 'modified',
+            'order'          => 'DESC',
+        ] );
+    }
+
+    private function format_row_for_response( array $row ){
+        return [
+            'verdict'        => $row['verdict'] ?? '',
+            'coverage_state' => $row['coverage_state'] ?? '',
+            'last_checked'   => $row['last_checked'] ?? '',
+            'error_message'  => $row['error_message'] ?? '',
+        ];
+    }
+
+    public function render(){
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Yetkiniz yok.', 'hge' ) );
+        }
+
+        $rows          = $this->get_data();
+        $summary       = $this->get_summary( $rows );
+        $gsc_connected = ( new \HGE\API\GSCClient() )->is_connected();
+        require HGE_DIR . 'templates/admin/index-status.php';
+    }
+}

@@ -13,6 +13,7 @@ HGE\DB\Migrator::drop_tables();
 delete_option( 'hge_settings' );
 delete_option( 'hge_gsc_tokens' );
 delete_option( 'hge_last_sync' );
+delete_option( 'hge_last_index_status_sync' );
 delete_option( 'hge_db_version' );
 
 // Transient'leri sil
@@ -22,4 +23,5 @@ $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_t
 
 // Cron'ları sil
 wp_clear_scheduled_hook( 'hge_daily_sync' );
+wp_clear_scheduled_hook( 'hge_index_status_sync' );
 wp_clear_scheduled_hook( 'hge_weekly_suggestions' );

@@ -169,6 +169,50 @@
 .hge-badge-error   { background: var(--hge-red-dim); color: var(--hge-red); border-color: var(--hge-red); }
 .hge-badge-warning { background: var(--hge-orange-dim); color: var(--hge-orange); border-color: var(--hge-orange); }
 
+.hge-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+}
+
+.hge-stat-card {
+    background: var(--hge-surface);
+    border: 1px solid var(--hge-border);
+    border-radius: 8px;
+    padding: 14px;
+}
+
+.hge-stat-card span {
+    display: block;
+    color: var(--hge-text-muted);
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
+.hge-stat-card strong {
+    color: var(--hge-text);
+    font-size: 24px;
+    line-height: 1;
+}
+
+.hge-btn-sm {
+    min-height: 30px;
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+.hge-index-indexed { background: var(--hge-green-dim); color: var(--hge-green); border-color: var(--hge-green); }
+.hge-index-not-indexed { background: var(--hge-orange-dim); color: var(--hge-orange); border-color: var(--hge-orange); }
+.hge-index-pending { background: rgba(160, 168, 208, .12); color: var(--hge-text-muted); border-color: var(--hge-border); }
+.hge-index-error { background: var(--hge-red-dim); color: var(--hge-red); border-color: var(--hge-red); }
+
+@media (max-width: 782px) {
+    .hge-stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 /* ----- KPI Grid ----- */
 .hge-kpi-grid {
     display: grid;

@@ -12,6 +12,7 @@ class GSCClient {
     const TOKEN_OPTION     = 'hge_gsc_tokens';
     const TOKEN_ENDPOINT   = 'https://oauth2.googleapis.com/token';
     const SEARCH_ANALYTICS = 'https://searchconsole.googleapis.com/webmasters/v3/sites/{siteUrl}/searchAnalytics/query';
+    const URL_INSPECTION   = 'https://searchconsole.googleapis.com/v1/urlInspection/index:inspect';
     const SITES_LIST       = 'https://www.googleapis.com/webmasters/v3/sites';
 
     private string $client_id;
@@ -154,6 +155,7 @@ class GSCClient {
 
         $end_date   = gmdate( 'Y-m-d', strtotime( '-3 days' ) ); // GSC 3 gün gecikme
         $start_date = gmdate( 'Y-m-d', strtotime( "-{$days} days" ) );
+        $row_limit  = max( 1, min( 25000, $row_limit ) );
 
         $endpoint = str_replace( '{siteUrl}', rawurlencode( $site_url ), self::SEARCH_ANALYTICS );
 
@@ -165,7 +167,10 @@ class GSCClient {
             'startRow'   => 0,
         ];
 
-        $response = wp_remote_post(
+        $all_rows = [];
+
+        do {
+            $response = wp_remote_post(
             $endpoint,
             [
                 'timeout' => 45,
@@ -189,7 +194,13 @@ class GSCClient {
             return new \WP_Error( 'gsc_api_error', $msg, [ 'status' => $http_code ] );
         }
 
-        return $data['rows'] ?? [];
+            $rows     = $data['rows'] ?? [];
+            $all_rows = array_merge( $all_rows, $rows );
+
+            $body['startRow'] += $row_limit;
+        } while ( count( $rows ) === $row_limit );
+
+        return $all_rows;
     }
 
     /**
@@ -203,7 +214,44 @@ class GSCClient {
      * Sayfa bazlı veri çek
      */
     public function get_page_stats( string $site_url, int $days = 30 ){
-        return $this->get_search_analytics( $site_url, $days, [ 'page' ], 500 );
+        return $this->get_search_analytics( $site_url, $days, [ 'page' ], 25000 );
+    }
+
+    public function inspect_url( string $site_url, string $inspection_url, string $language_code = 'tr-TR' ){
+        $access_token = $this->get_access_token();
+        if ( is_wp_error( $access_token ) ) {
+            return $access_token;
+        }
+
+        $response = wp_remote_post(
+            self::URL_INSPECTION,
+            [
+                'timeout' => 30,
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $access_token,
+                    'Content-Type'  => 'application/json',
+                ],
+                'body' => wp_json_encode( [
+                    'inspectionUrl' => $inspection_url,
+                    'siteUrl'       => $site_url,
+                    'languageCode'  => $language_code,
+                ] ),
+            ]
+        );
+
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+
+        $http_code = wp_remote_retrieve_response_code( $response );
+        $data      = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        if ( $http_code !== 200 ) {
+            $msg = $data['error']['message'] ?? __( 'URL Inspection API hatası.', 'hge' );
+            return new \WP_Error( 'gsc_url_inspection_error', $msg, [ 'status' => $http_code ] );
+        }
+
+        return $data['inspectionResult'] ?? [];
     }
 
     /**

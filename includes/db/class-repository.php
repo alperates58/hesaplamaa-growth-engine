@@ -16,6 +16,7 @@ class Repository {
     public string $page_stats;
     public string $suggestions;
     public string $ai_insights;
+    public string $index_status;
 
     public function __construct() {
         global $wpdb;
@@ -25,6 +26,7 @@ class Repository {
         $this->page_stats  = $wpdb->prefix . 'hge_page_stats';
         $this->suggestions = $wpdb->prefix . 'hge_suggestions';
         $this->ai_insights = $wpdb->prefix . 'hge_ai_insights';
+        $this->index_status = $wpdb->prefix . 'hge_index_status';
     }
 
     // -------------------------------------------------------------------------
@@ -137,7 +139,6 @@ class Repository {
         $results = $this->wpdb->get_results(
             $this->wpdb->prepare(
                 "SELECT * FROM {$this->keywords}
-                 WHERE avg_position BETWEEN 4 AND 30
                  ORDER BY opportunity_score DESC, impressions DESC
                  LIMIT %d",
                 $limit
@@ -146,8 +147,12 @@ class Repository {
         );
 
         $data = $results ?: [];
-        set_transient( $cache_key, $data, 3600 );
+        set_transient( $cache_key, $data, $this->get_cache_ttl() );
         return $data;
+    }
+
+    public function get_keyword_count(){
+        return (int) $this->wpdb->get_var( "SELECT COUNT(*) FROM {$this->keywords}" );
     }
 
     public function get_top_rising( int $limit = 10 ){
@@ -211,7 +216,7 @@ class Repository {
         return (bool) $this->wpdb->insert( $this->page_stats, $data );
     }
 
-    public function get_all_page_stats( int $limit = 200 ){
+    public function get_all_page_stats( int $limit = 1000 ){
         return $this->wpdb->get_results(
             $this->wpdb->prepare(
                 "SELECT * FROM {$this->page_stats}
@@ -335,6 +340,114 @@ class Repository {
     }
 
     // -------------------------------------------------------------------------
+    // Dizin durumu
+    // -------------------------------------------------------------------------
+
+    public function upsert_index_status( array $row ){
+        $url      = esc_url_raw( $row['page_url'] ?? '' );
+        $url_hash = md5( $url );
+        $existing = $this->wpdb->get_var(
+            $this->wpdb->prepare(
+                "SELECT id FROM {$this->index_status} WHERE url_hash = %s",
+                $url_hash
+            )
+        );
+
+        $data = [
+            'url_hash'         => $url_hash,
+            'page_url'         => $url,
+            'page_title'       => sanitize_text_field( $row['page_title'] ?? '' ),
+            'post_id'          => (int) ( $row['post_id'] ?? 0 ),
+            'verdict'          => sanitize_text_field( $row['verdict'] ?? '' ),
+            'coverage_state'   => sanitize_text_field( $row['coverage_state'] ?? '' ),
+            'robots_txt_state' => sanitize_text_field( $row['robots_txt_state'] ?? '' ),
+            'indexing_state'   => sanitize_text_field( $row['indexing_state'] ?? '' ),
+            'page_fetch_state' => sanitize_text_field( $row['page_fetch_state'] ?? '' ),
+            'google_canonical' => esc_url_raw( $row['google_canonical'] ?? '' ),
+            'user_canonical'   => esc_url_raw( $row['user_canonical'] ?? '' ),
+            'crawled_as'       => sanitize_text_field( $row['crawled_as'] ?? '' ),
+            'last_crawl_time'  => $this->mysql_datetime_or_null( $row['last_crawl_time'] ?? '' ),
+            'inspection_link'  => esc_url_raw( $row['inspection_link'] ?? '' ),
+            'error_message'    => sanitize_textarea_field( $row['error_message'] ?? '' ),
+            'last_checked'     => current_time( 'mysql' ),
+        ];
+
+        if ( $existing ) {
+            return (bool) $this->wpdb->update( $this->index_status, $data, [ 'id' => $existing ] );
+        }
+
+        $data['created_at'] = current_time( 'mysql' );
+        return (bool) $this->wpdb->insert( $this->index_status, $data );
+    }
+
+    public function queue_index_status_url( string $url, string $title = '', int $post_id = 0 ){
+        $url = esc_url_raw( $url );
+        if ( empty( $url ) ) {
+            return false;
+        }
+
+        $url_hash = md5( $url );
+        $existing = $this->wpdb->get_var(
+            $this->wpdb->prepare(
+                "SELECT id FROM {$this->index_status} WHERE url_hash = %s",
+                $url_hash
+            )
+        );
+
+        if ( $existing ) {
+            return (bool) $this->wpdb->update(
+                $this->index_status,
+                [
+                    'page_title'       => sanitize_text_field( $title ),
+                    'post_id'          => (int) $post_id,
+                    'verdict'          => '',
+                    'coverage_state'   => '',
+                    'error_message'    => '',
+                    'last_checked'     => null,
+                ],
+                [ 'id' => $existing ]
+            );
+        }
+
+        return (bool) $this->wpdb->insert(
+            $this->index_status,
+            [
+                'url_hash'     => $url_hash,
+                'page_url'     => $url,
+                'page_title'   => sanitize_text_field( $title ),
+                'post_id'      => (int) $post_id,
+                'last_checked' => null,
+                'created_at'   => current_time( 'mysql' ),
+            ]
+        );
+    }
+
+    public function get_index_status_map(){
+        $rows = $this->wpdb->get_results(
+            "SELECT * FROM {$this->index_status}",
+            ARRAY_A
+        ) ?: [];
+
+        $map = [];
+        foreach ( $rows as $row ) {
+            $map[ $row['page_url'] ] = $row;
+            if ( ! empty( $row['post_id'] ) ) {
+                $map[ 'post:' . (int) $row['post_id'] ] = $row;
+            }
+        }
+        return $map;
+    }
+
+    private function mysql_datetime_or_null( string $value ){
+        if ( empty( $value ) ) {
+            return null;
+        }
+
+        $timestamp = strtotime( $value );
+        return $timestamp ? gmdate( 'Y-m-d H:i:s', $timestamp ) : null;
+    }
+
+    // -------------------------------------------------------------------------
     // Yardımcı
     // -------------------------------------------------------------------------
 
@@ -370,5 +483,10 @@ class Repository {
         }
 
         return min( 100, $score );
+    }
+
+    private function get_cache_ttl(){
+        $settings = get_option( 'hge_settings', [] );
+        return max( 60, (int) ( $settings['cache_ttl'] ?? 3600 ) );
     }
 }

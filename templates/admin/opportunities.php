@@ -7,7 +7,7 @@
             </div>
             <div>
                 <h1 class="hge-page-title"><?php esc_html_e( 'Keyword Fırsatları', 'hge' ); ?></h1>
-                <p class="hge-page-subtitle"><?php printf( esc_html__( '%d fırsat bulundu', 'hge' ), count( $opportunities ) ); ?></p>
+                <p class="hge-page-subtitle"><?php printf( esc_html__( '%1$d / %2$d keyword gösteriliyor', 'hge' ), count( $opportunities ), (int) $total_keywords ); ?></p>
             </div>
         </div>
         <?php if ( ! $gsc_connected ): ?>
@@ -21,14 +21,16 @@
 
     <div class="hge-card">
         <div class="hge-card-header">
-            <h3><?php esc_html_e( 'Pozisyon 4–30 Arası Yükseltilebilir Kelimeler', 'hge' ); ?></h3>
+            <h3><?php esc_html_e( 'Tüm Keyword Performansı', 'hge' ); ?></h3>
             <div class="hge-filter-row">
                 <input type="text" id="hge-kw-search" class="hge-input hge-input-sm" placeholder="<?php esc_attr_e( 'Keyword ara...', 'hge' ); ?>">
                 <select id="hge-pos-filter" class="hge-select hge-select-sm">
                     <option value=""><?php esc_html_e( 'Tüm Pozisyonlar', 'hge' ); ?></option>
-                    <option value="4-10"><?php esc_html_e( '4–10 (Yüksek)', 'hge' ); ?></option>
-                    <option value="11-20"><?php esc_html_e( '11–20 (Orta)', 'hge' ); ?></option>
-                    <option value="21-30"><?php esc_html_e( '21–30 (Uzak)', 'hge' ); ?></option>
+                    <option value="1-3"><?php esc_html_e( '1-3 (Güçlü)', 'hge' ); ?></option>
+                    <option value="4-10"><?php esc_html_e( '4-10 (Yüksek)', 'hge' ); ?></option>
+                    <option value="11-20"><?php esc_html_e( '11-20 (Orta)', 'hge' ); ?></option>
+                    <option value="21-30"><?php esc_html_e( '21-30 (Uzak)', 'hge' ); ?></option>
+                    <option value="31+"><?php esc_html_e( '31+ (Yeni plan)', 'hge' ); ?></option>
                 </select>
             </div>
         </div>
@@ -36,7 +38,7 @@
             <?php if ( empty( $opportunities ) ): ?>
                 <div class="hge-empty-state">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    <p><?php esc_html_e( 'GSC senkronizasyonu tamamlandıktan sonra fırsatlar burada görünecek.', 'hge' ); ?></p>
+                    <p><?php esc_html_e( 'GSC senkronizasyonu tamamlandıktan sonra keywordler burada görünecek.', 'hge' ); ?></p>
                     <a href="<?php echo esc_url( admin_url( 'admin.php?page=hge-settings' ) ); ?>" class="hge-btn hge-btn-primary">
                         <?php esc_html_e( 'Ayarlara Git', 'hge' ); ?>
                     </a>

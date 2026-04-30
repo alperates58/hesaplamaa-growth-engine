@@ -9,8 +9,20 @@ defined( 'ABSPATH' ) || exit;
 class Scheduler {
 
     public function register(){
-        add_action( 'hge_daily_sync',        [ $this, 'run_daily_sync' ] );
+        add_action( 'hge_daily_sync',         [ $this, 'run_daily_sync' ] );
+        add_action( 'hge_index_status_sync',  [ $this, 'run_index_status_sync' ] );
         add_action( 'hge_weekly_suggestions', [ $this, 'run_weekly_suggestions' ] );
+        add_action( 'init', [ $this, 'ensure_scheduled_events' ] );
+    }
+
+    public function ensure_scheduled_events(){
+        if ( ! wp_next_scheduled( 'hge_daily_sync' ) ) {
+            wp_schedule_event( time(), 'daily', 'hge_daily_sync' );
+        }
+
+        if ( ! wp_next_scheduled( 'hge_index_status_sync' ) ) {
+            wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'hge_index_status_sync' );
+        }
     }
 
     public function run_daily_sync(){
@@ -27,7 +39,6 @@ class Scheduler {
             return $log;
         }
 
-        // 1. Günlük aggregate istatistikler
         $daily = $gsc->get_daily_stats( $site_url, $days );
         if ( ! is_wp_error( $daily ) ) {
             $count = 0;
@@ -47,69 +58,36 @@ class Scheduler {
             $log[] = 'Günlük istatistik hatası: ' . $daily->get_error_message();
         }
 
-        // 2. Keyword + sayfa performansı
-        $kw_data = $gsc->get_search_analytics( $site_url, $days, [ 'query', 'page' ], 2000 );
+        $kw_data = $gsc->get_search_analytics( $site_url, $days, [ 'query', 'page' ], 25000 );
         if ( ! is_wp_error( $kw_data ) ) {
             $count = 0;
-            // Sayfa bazlı agregasyon
-            $page_agg = [];
             foreach ( $kw_data as $row ) {
                 $keys    = $row['keys'] ?? [];
                 $keyword = $keys[0] ?? '';
                 $page    = $keys[1] ?? '';
+
+                if ( empty( $keyword ) || empty( $page ) ) {
+                    continue;
+                }
 
                 $repo->upsert_keyword( [
                     'keyword'      => $keyword,
                     'page_url'     => $page,
                     'impressions'  => $row['impressions'] ?? 0,
                     'clicks'       => $row['clicks']      ?? 0,
-                    'ctr'          => $row['ctr']          ?? 0,
-                    'avg_position' => $row['position']     ?? 0,
+                    'ctr'          => $row['ctr']         ?? 0,
+                    'avg_position' => $row['position']    ?? 0,
                 ] );
-
-                // Sayfa toplamlarını agrege et
-                if ( ! isset( $page_agg[ $page ] ) ) {
-                    $page_agg[ $page ] = [
-                        'page_url'     => $page,
-                        'impressions'  => 0,
-                        'clicks'       => 0,
-                        'ctr_sum'      => 0,
-                        'pos_sum'      => 0,
-                        'row_count'    => 0,
-                        'main_keyword' => $keyword,
-                    ];
-                }
-                $page_agg[ $page ]['impressions'] += $row['impressions'] ?? 0;
-                $page_agg[ $page ]['clicks']      += $row['clicks']      ?? 0;
-                $page_agg[ $page ]['ctr_sum']     += $row['ctr']         ?? 0;
-                $page_agg[ $page ]['pos_sum']     += $row['position']    ?? 0;
-                $page_agg[ $page ]['row_count']   += 1;
                 $count++;
             }
 
-            // Sayfa istatistiklerini kaydet
-            foreach ( $page_agg as $page => $agg ) {
-                $cnt = max( 1, $agg['row_count'] );
-                $repo->upsert_page_stat( [
-                    'page_url'     => $page,
-                    'impressions'  => $agg['impressions'],
-                    'clicks'       => $agg['clicks'],
-                    'ctr'          => $agg['ctr_sum'] / $cnt,
-                    'avg_position' => $agg['pos_sum'] / $cnt,
-                    'main_keyword' => $agg['main_keyword'],
-                ] );
-            }
-
-            $log[] = "Keyword: {$count} satır, " . count( $page_agg ) . " sayfa kaydedildi.";
+            $page_count = $this->sync_page_stats( $gsc, $repo, $site_url, $days, $kw_data, $log );
+            $log[] = "Keyword: {$count} satır, {$page_count} sayfa kaydedildi.";
         } else {
             $log[] = 'Keyword hatası: ' . $kw_data->get_error_message();
         }
 
-        // 3. Cache temizle
-        delete_transient( 'hge_dashboard_summary' );
-        delete_transient( 'hge_daily_stats_30' );
-        delete_transient( 'hge_opportunities_100' );
-        delete_transient( 'hge_opportunities_200' );
+        $this->clear_caches();
 
         update_option( 'hge_last_sync', current_time( 'mysql' ) );
         $log[] = 'Senkronizasyon tamamlandı: ' . current_time( 'mysql' );
@@ -117,10 +95,144 @@ class Scheduler {
         return $log;
     }
 
+    private function sync_page_stats( \HGE\API\GSCClient $gsc, \HGE\DB\Repository $repo, string $site_url, int $days, array $kw_data, array &$log ){
+        $page_data     = $gsc->get_page_stats( $site_url, $days );
+        $main_keywords = $this->extract_main_keywords( $kw_data );
+
+        if ( ! is_wp_error( $page_data ) ) {
+            $count = 0;
+            foreach ( $page_data as $row ) {
+                $keys = $row['keys'] ?? [];
+                $page = $keys[0] ?? '';
+
+                if ( empty( $page ) ) {
+                    continue;
+                }
+
+                $impressions = (int) ( $row['impressions'] ?? 0 );
+                $clicks      = (int) ( $row['clicks'] ?? 0 );
+
+                $repo->upsert_page_stat( [
+                    'page_url'     => $page,
+                    'impressions'  => $impressions,
+                    'clicks'       => $clicks,
+                    'ctr'          => $impressions > 0 ? $clicks / $impressions : 0,
+                    'avg_position' => $row['position'] ?? 0,
+                    'main_keyword' => $main_keywords[ $page ] ?? '',
+                ] );
+                $count++;
+            }
+
+            return $count;
+        }
+
+        $log[] = 'Sayfa istatistiği hatası: ' . $page_data->get_error_message();
+        return $this->sync_page_stats_from_keywords( $repo, $kw_data );
+    }
+
+    private function sync_page_stats_from_keywords( \HGE\DB\Repository $repo, array $kw_data ){
+        $page_agg = [];
+
+        foreach ( $kw_data as $row ) {
+            $keys = $row['keys'] ?? [];
+            $page = $keys[1] ?? '';
+
+            if ( empty( $page ) ) {
+                continue;
+            }
+
+            if ( ! isset( $page_agg[ $page ] ) ) {
+                $page_agg[ $page ] = [
+                    'impressions'     => 0,
+                    'clicks'          => 0,
+                    'position_sum'    => 0,
+                    'position_weight' => 0,
+                    'main_keyword'    => $keys[0] ?? '',
+                ];
+            }
+
+            $impressions = (int) ( $row['impressions'] ?? 0 );
+            $weight      = max( 1, $impressions );
+
+            $page_agg[ $page ]['impressions']     += $impressions;
+            $page_agg[ $page ]['clicks']          += (int) ( $row['clicks'] ?? 0 );
+            $page_agg[ $page ]['position_sum']    += (float) ( $row['position'] ?? 0 ) * $weight;
+            $page_agg[ $page ]['position_weight'] += $weight;
+        }
+
+        foreach ( $page_agg as $page => $agg ) {
+            $impressions = (int) $agg['impressions'];
+            $clicks      = (int) $agg['clicks'];
+            $weight      = max( 1, (int) $agg['position_weight'] );
+
+            $repo->upsert_page_stat( [
+                'page_url'     => $page,
+                'impressions'  => $impressions,
+                'clicks'       => $clicks,
+                'ctr'          => $impressions > 0 ? $clicks / $impressions : 0,
+                'avg_position' => $agg['position_sum'] / $weight,
+                'main_keyword' => $agg['main_keyword'],
+            ] );
+        }
+
+        return count( $page_agg );
+    }
+
+    private function extract_main_keywords( array $kw_data ){
+        $best = [];
+
+        foreach ( $kw_data as $row ) {
+            $keys    = $row['keys'] ?? [];
+            $keyword = $keys[0] ?? '';
+            $page    = $keys[1] ?? '';
+
+            if ( empty( $keyword ) || empty( $page ) ) {
+                continue;
+            }
+
+            $clicks      = (int) ( $row['clicks'] ?? 0 );
+            $impressions = (int) ( $row['impressions'] ?? 0 );
+            $score       = ( $clicks * 1000000 ) + $impressions;
+
+            if ( ! isset( $best[ $page ] ) || $score > $best[ $page ]['score'] ) {
+                $best[ $page ] = [
+                    'keyword' => $keyword,
+                    'score'   => $score,
+                ];
+            }
+        }
+
+        return array_map(
+            static fn( $row ) => $row['keyword'],
+            $best
+        );
+    }
+
+    private function clear_caches(){
+        delete_transient( 'hge_dashboard_summary' );
+        foreach ( [ 7, 14, 30, 60, 90 ] as $days ) {
+            delete_transient( "hge_daily_stats_{$days}" );
+        }
+        delete_transient( 'hge_opportunities_100' );
+        delete_transient( 'hge_opportunities_200' );
+        delete_transient( 'hge_opportunities_1000' );
+    }
+
     public function run_weekly_suggestions(){
         $suggest = new \HGE\API\SuggestClient();
         $ideas   = new \HGE\Admin\NewIdeas();
         $result  = $ideas->fetch_and_store();
         return [ count( $result ) . ' öneri güncellendi.' ];
+    }
+
+    public function run_index_status_sync(){
+        if ( ! ( new \HGE\API\GSCClient() )->is_connected() ) {
+            return [ 'GSC bağlı değil, dizin durumu kontrolü atlandı.' ];
+        }
+
+        $index_status = new \HGE\Admin\IndexStatus();
+        $result       = $index_status->inspect_pending( 10 );
+        update_option( 'hge_last_index_status_sync', current_time( 'mysql' ) );
+        return [ count( $result ) . ' URL dizin durumu kontrol edildi.' ];
     }
 }
