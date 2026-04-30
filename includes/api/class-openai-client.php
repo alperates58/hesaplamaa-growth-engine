@@ -274,7 +274,7 @@ class OpenAIClient {
             return new \WP_Error( 'hge_openai_empty_topic', __( 'Konu alanı boş.', 'hge' ) );
         }
 
-        $cache_key = 'hge_ai_topic_ideas_' . md5( strtolower( $topic ) );
+        $cache_key = 'hge_ai_topic_ideas_v2_' . md5( strtolower( $topic ) );
         $cached    = get_transient( $cache_key );
         if ( is_array( $cached ) && ! empty( $cached ) ) {
             return $cached;
@@ -297,7 +297,7 @@ class OpenAIClient {
                     ],
                     [
                         'role' => 'user',
-                        'content' => "\"{$topic}\" alanı için hesaplamaa.com sitesine eklenmesi en mantıklı 20 hesaplama aracını öner. Her fikir arama niyetli keyword olmalı ve \"... hesaplama\" kalıbına yakın olmalı. Türkiye pazarı için aylık hacim tahmini, rekabet ve fırsat skoru ver. competition LOW, MEDIUM, HIGH olmalı. JSON: {\"ideas\":[{\"keyword\":\"...\",\"monthly_volume\":1000,\"competition\":\"MEDIUM\",\"opportunity_score\":80,\"reason\":\"...\"}]}",
+                        'content' => "\"{$topic}\" konusu için hesaplamaa.com sitesine eklenebilecek 30 gerçek hesaplama aracı keywordü öner. Kurallar: 1) Keyword mutlaka kullanıcının yazdığı konuyla doğrudan ilgili olsun. 2) Genel ve anlamsız başlık üretme: \"dönüştürücü hesaplama\", \"oran hesaplama\", \"puan hesaplama\" gibi konu belirtmeyen ifadeler yasak. 3) Her öneri Google'da aranabilecek doğal Türkçe sorgu olsun; tercihen \"... hesaplama\" veya net hesaplayıcı niyeti taşısın. 4) Zaman konusu için tarih, gün, hafta, saat, mesai, yaş, geri sayım ve iş günü araçlarına odaklan. 5) Sağlık konusu için kilo, VKİ, kalori, gebelik, yumurtlama, su/protein ihtiyacı gibi ölçülebilir araçlara odaklan. Türkiye pazarı için aylık hacim tahmini, rekabet ve fırsat skoru ver. competition LOW, MEDIUM, HIGH olmalı. JSON: {\"ideas\":[{\"keyword\":\"...\",\"monthly_volume\":1000,\"competition\":\"MEDIUM\",\"opportunity_score\":80,\"reason\":\"...\"}]}",
                     ],
                 ],
                 'max_output_tokens' => 1400,
@@ -351,7 +351,7 @@ class OpenAIClient {
             ];
         }
 
-        $ideas = array_slice( $ideas, 0, 20 );
+        $ideas = array_slice( $ideas, 0, 30 );
         if ( empty( $ideas ) ) {
             $ideas = $this->fallback_topic_ideas( $topic );
         }
@@ -392,15 +392,15 @@ class OpenAIClient {
     private function fallback_topic_ideas( string $topic ){
         $topic_lc = strtolower( $topic );
         $map = [
-            'sağlık' => [ 'ideal kilo hesaplama', 'vücut kitle indeksi hesaplama', 'kalori ihtiyacı hesaplama', 'gebelik haftası hesaplama', 'yumurtlama günü hesaplama', 'bazal metabolizma hesaplama', 'su ihtiyacı hesaplama', 'tansiyon risk hesaplama', 'bel kalça oranı hesaplama', 'protein ihtiyacı hesaplama' ],
-            'saglik' => [ 'ideal kilo hesaplama', 'vücut kitle indeksi hesaplama', 'kalori ihtiyacı hesaplama', 'gebelik haftası hesaplama', 'yumurtlama günü hesaplama', 'bazal metabolizma hesaplama', 'su ihtiyacı hesaplama', 'tansiyon risk hesaplama', 'bel kalça oranı hesaplama', 'protein ihtiyacı hesaplama' ],
+            'sağlık' => [ 'ideal kilo hesaplama', 'vücut kitle indeksi hesaplama', 'kalori ihtiyacı hesaplama', 'gebelik haftası hesaplama', 'yumurtlama günü hesaplama', 'bazal metabolizma hesaplama', 'su ihtiyacı hesaplama', 'tansiyon risk hesaplama', 'bel kalça oranı hesaplama', 'protein ihtiyacı hesaplama', 'günlük kalori hesaplama', 'hamilelik haftası hesaplama' ],
+            'saglik' => [ 'ideal kilo hesaplama', 'vücut kitle indeksi hesaplama', 'kalori ihtiyacı hesaplama', 'gebelik haftası hesaplama', 'yumurtlama günü hesaplama', 'bazal metabolizma hesaplama', 'su ihtiyacı hesaplama', 'tansiyon risk hesaplama', 'bel kalça oranı hesaplama', 'protein ihtiyacı hesaplama', 'günlük kalori hesaplama', 'hamilelik haftası hesaplama' ],
             'finans' => [ 'kredi hesaplama', 'faiz hesaplama', 'mevduat faizi hesaplama', 'kredi kartı asgari ödeme hesaplama', 'ihtiyaç kredisi hesaplama', 'konut kredisi hesaplama', 'araç kredisi hesaplama', 'enflasyon hesaplama', 'bileşik faiz hesaplama', 'taksit hesaplama' ],
-            'zaman' => [ 'iki tarih arası gün hesaplama', 'kaç gün kaldı hesaplama', 'hafta hesaplama', 'mesai saati hesaplama', 'yaş hesaplama', 'doğum günü hesaplama', 'yılın kaçıncı günü hesaplama', 'iş günü hesaplama', 'tatil günü hesaplama', 'saat farkı hesaplama' ],
+            'zaman' => [ 'iki tarih arası gün hesaplama', 'kaç gün kaldı hesaplama', 'hafta hesaplama', 'mesai saati hesaplama', 'yaş hesaplama', 'doğum günü hesaplama', 'yılın kaçıncı günü hesaplama', 'iş günü hesaplama', 'tatil günü hesaplama', 'saat farkı hesaplama', 'geri sayım hesaplama', 'dakika saat hesaplama', 'ay farkı hesaplama', 'çalışma saati hesaplama' ],
         ];
 
         $keywords = $map[ $topic_lc ] ?? array_map( function ( $suffix ) use ( $topic ){
             return trim( $topic . ' ' . $suffix );
-        }, [ 'hesaplama', 'oran hesaplama', 'puan hesaplama', 'maliyet hesaplama', 'süre hesaplama', 'ihtiyaç hesaplama', 'risk hesaplama', 'tutar hesaplama', 'gün hesaplama', 'formül hesaplama' ] );
+        }, [ 'hesaplama aracı', 'süre hesaplama', 'ihtiyaç hesaplama', 'risk hesaplama', 'tutar hesaplama', 'gün hesaplama', 'formül hesaplama' ] );
 
         $ideas = [];
         foreach ( array_slice( $keywords, 0, 20 ) as $index => $keyword ) {

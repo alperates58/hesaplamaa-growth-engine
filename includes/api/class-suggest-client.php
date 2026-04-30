@@ -77,6 +77,10 @@ class SuggestClient {
             $seed_source = in_array( $seed, $this->seed_keywords, true ) ? 'google_suggest' : 'ai_seed_google_suggest';
             $suggestions = $this->get_suggestions( $seed );
             foreach ( $suggestions as $suggestion ) {
+                if ( ! $this->is_calculator_keyword( $suggestion ) ) {
+                    continue;
+                }
+
                 if ( ! isset( $seen[ $suggestion ] ) ) {
                     $seen[ $suggestion ] = true;
                     $results[] = [
@@ -88,6 +92,50 @@ class SuggestClient {
             }
             // Rate limit — Google Suggest'i yavaşlat
             usleep( 200000 ); // 200ms
+        }
+
+        return $results;
+    }
+
+    /**
+     * Kullanici konusuna ozel Google Suggest taramasi yap.
+     *
+     * @return array [ 'keyword' => string, 'seed' => string, 'seed_source' => string ]
+     */
+    public function get_topic_suggestions( string $topic, int $limit = 40 ){
+        $topic = sanitize_text_field( $topic );
+        if ( $topic === '' ) {
+            return [];
+        }
+
+        $seeds   = $this->build_topic_seeds( $topic );
+        $results = [];
+        $seen    = [];
+
+        foreach ( $seeds as $seed ) {
+            foreach ( $this->get_suggestions( $seed ) as $suggestion ) {
+                if ( ! $this->is_calculator_keyword( $suggestion ) || ! $this->is_topic_relevant( $suggestion, $topic ) ) {
+                    continue;
+                }
+
+                $key = $this->normalize_keyword( $suggestion );
+                if ( isset( $seen[ $key ] ) ) {
+                    continue;
+                }
+
+                $seen[ $key ] = true;
+                $results[] = [
+                    'keyword'     => $suggestion,
+                    'seed'        => $seed,
+                    'seed_source' => 'topic_google_suggest',
+                ];
+
+                if ( count( $results ) >= $limit ) {
+                    return $results;
+                }
+            }
+
+            usleep( 150000 );
         }
 
         return $results;
@@ -175,6 +223,130 @@ class SuggestClient {
             'monthly_volume' => $volume,
             'competition'    => $competition,
         ];
+    }
+
+    private function build_topic_seeds( string $topic ){
+        $topic_lc = $this->normalize_keyword( $topic );
+
+        $topic_map = [
+            'zaman' => [
+                'zaman hesaplama',
+                'tarih hesaplama',
+                'gün hesaplama',
+                'kaç gün',
+                'kaç hafta',
+                'iki tarih arası',
+                'mesai saati hesaplama',
+                'iş günü hesaplama',
+            ],
+            'tarih' => [
+                'tarih hesaplama',
+                'iki tarih arası',
+                'gün hesaplama',
+                'kaç gün',
+                'hafta hesaplama',
+            ],
+            'saglik' => [
+                'sağlık hesaplama',
+                'ideal kilo hesaplama',
+                'vücut kitle indeksi hesaplama',
+                'kalori hesaplama',
+                'gebelik hesaplama',
+                'yumurtlama hesaplama',
+                'protein ihtiyacı hesaplama',
+                'su ihtiyacı hesaplama',
+            ],
+            'finans' => [
+                'finans hesaplama',
+                'kredi hesaplama',
+                'faiz hesaplama',
+                'mevduat hesaplama',
+                'taksit hesaplama',
+                'enflasyon hesaplama',
+            ],
+        ];
+
+        $seeds = $topic_map[ $topic_lc ] ?? [];
+        $seeds = array_merge( [
+            $topic,
+            $topic . ' hesaplama',
+            $topic . ' hesaplayıcı',
+            $topic . ' aracı',
+            $topic . ' kaç',
+            $topic . ' ne kadar',
+        ], $seeds );
+
+        $seeds = array_map( 'sanitize_text_field', $seeds );
+        $seeds = array_filter( $seeds );
+
+        return array_values( array_unique( $seeds ) );
+    }
+
+    private function is_calculator_keyword( string $keyword ){
+        $keyword_lc = $this->normalize_keyword( $keyword );
+
+        $blocked_exact = [
+            'donusturucu hesaplama',
+            'dönüştürücü hesaplama',
+            'cevirici hesaplama',
+            'çevirici hesaplama',
+            'hesaplama donusturucu',
+            'hesaplama dönüştürücü',
+        ];
+
+        if ( in_array( $keyword_lc, $blocked_exact, true ) ) {
+            return false;
+        }
+
+        $signals = [
+            'hesap',
+            'hesaplama',
+            'hesaplayici',
+            'hesaplayıcı',
+            'kac gun',
+            'kaç gün',
+            'kac hafta',
+            'kaç hafta',
+            'ne kadar',
+            'oran',
+            'yuzde',
+            'yüzde',
+        ];
+
+        foreach ( $signals as $signal ) {
+            if ( strpos( $keyword_lc, $signal ) !== false ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function is_topic_relevant( string $keyword, string $topic ){
+        $keyword_lc = $this->normalize_keyword( $keyword );
+        $topic_lc   = $this->normalize_keyword( $topic );
+
+        $topic_terms = [
+            'zaman' => [ 'zaman', 'tarih', 'gun', 'gün', 'hafta', 'ay', 'yil', 'yıl', 'saat', 'dakika', 'mesai', 'is gunu', 'iş günü', 'yas', 'yaş', 'dogum', 'doğum', 'kac gun', 'kaç gün' ],
+            'tarih' => [ 'tarih', 'gun', 'gün', 'hafta', 'ay', 'yil', 'yıl', 'saat', 'mesai', 'is gunu', 'iş günü', 'kac gun', 'kaç gün' ],
+            'saglik' => [ 'saglik', 'sağlık', 'kilo', 'vucut', 'vücut', 'bmi', 'kalori', 'gebelik', 'hamilelik', 'yumurtlama', 'protein', 'su ihtiyaci', 'su ihtiyacı', 'tansiyon', 'bel kalca', 'bel kalça', 'metabolizma' ],
+            'finans' => [ 'finans', 'kredi', 'faiz', 'maas', 'maaş', 'vergi', 'mevduat', 'taksit', 'enflasyon', 'kur', 'doviz', 'döviz', 'kredi karti', 'kredi kartı' ],
+        ];
+
+        $terms = $topic_terms[ $topic_lc ] ?? [ $topic_lc ];
+        foreach ( $terms as $term ) {
+            if ( $term !== '' && strpos( $keyword_lc, $term ) !== false ) {
+                return true;
+            }
+        }
+
+        return strpos( $keyword_lc, $topic_lc ) !== false;
+    }
+
+    private function normalize_keyword( string $keyword ){
+        $keyword = strtolower( remove_accents( $keyword ) );
+        $keyword = preg_replace( '/\s+/u', ' ', $keyword );
+        return trim( (string) $keyword );
     }
 
     public function get_ai_metric_estimates( array $keywords ){

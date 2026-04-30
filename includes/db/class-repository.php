@@ -268,6 +268,14 @@ class Repository {
         );
     }
 
+    public function delete_suggestions_by_source( string $source ){
+        return (bool) $this->wpdb->delete(
+            $this->suggestions,
+            [ 'source' => sanitize_text_field( $source ) ],
+            [ '%s' ]
+        );
+    }
+
     public function get_suggestions( int $limit = 100 ){
         return $this->wpdb->get_results(
             $this->wpdb->prepare(

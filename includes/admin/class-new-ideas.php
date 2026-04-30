@@ -59,18 +59,48 @@ class NewIdeas {
             return $ideas;
         }
 
-        $enriched = $this->suggest->enrich_with_site_data( array_map( function ( array $idea ) use ( $topic ){
-            return [
-                'keyword'        => $idea['keyword'],
-                'seed'           => $topic,
-                'seed_source'    => 'ai_topic',
-                'monthly_volume' => $idea['monthly_volume'],
-                'competition'    => $idea['competition'],
+        $this->repo->delete_suggestions_by_source( 'ai_topic' );
+
+        $merged = [];
+        foreach ( $ideas as $idea ) {
+            $keyword = sanitize_text_field( $idea['keyword'] ?? '' );
+            if ( $keyword === '' ) {
+                continue;
+            }
+
+            $merged[ $this->normalize_keyword_key( $keyword ) ] = [
+                'keyword'           => $keyword,
+                'seed'              => $topic,
+                'seed_source'       => 'ai_topic',
+                'monthly_volume'    => (int) ( $idea['monthly_volume'] ?? 0 ),
+                'competition'       => sanitize_text_field( $idea['competition'] ?? 'MEDIUM' ),
+                'opportunity_score' => (int) ( $idea['opportunity_score'] ?? 70 ),
             ];
-        }, $ideas ) );
+        }
+
+        foreach ( $this->suggest->get_topic_suggestions( $topic, 45 ) as $suggestion ) {
+            $keyword = sanitize_text_field( $suggestion['keyword'] ?? '' );
+            if ( $keyword === '' ) {
+                continue;
+            }
+
+            $key = $this->normalize_keyword_key( $keyword );
+            if ( isset( $merged[ $key ] ) ) {
+                continue;
+            }
+
+            $merged[ $key ] = [
+                'keyword'     => $keyword,
+                'seed'        => sanitize_text_field( $suggestion['seed'] ?? $topic ),
+                'seed_source' => 'ai_topic',
+            ];
+        }
+
+        $enriched = $this->suggest->enrich_with_site_data( array_values( $merged ) );
 
         foreach ( $enriched as $index => $item ) {
-            $ai_score = (int) ( $ideas[ $index ]['opportunity_score'] ?? 0 );
+            $key      = $this->normalize_keyword_key( $item['keyword'] ?? '' );
+            $ai_score = (int) ( $merged[ $key ]['opportunity_score'] ?? 0 );
             if ( $ai_score > 0 ) {
                 $item['opportunity_score'] = $ai_score;
                 $item['should_create'] = ( ! $item['exists_on_site'] && $ai_score >= 60 ) ? 1 : 0;
@@ -88,6 +118,12 @@ class NewIdeas {
         }
 
         return $this->repo->get_suggestions( 200 );
+    }
+
+    private function normalize_keyword_key( string $keyword ){
+        $keyword = strtolower( remove_accents( $keyword ) );
+        $keyword = preg_replace( '/\s+/u', ' ', $keyword );
+        return trim( (string) $keyword );
     }
 
     public function render(){
