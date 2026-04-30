@@ -11,7 +11,7 @@
             </div>
         </div>
         <div class="hge-header-right">
-            <button class="hge-btn hge-btn-primary" id="hge-index-batch" <?php disabled( ! $gsc_connected ); ?>>
+            <button class="hge-btn hge-btn-primary" id="hge-index-batch" data-loading-text="<?php esc_attr_e( 'Kontrol ediliyor...', 'hge' ); ?>" <?php disabled( ! $gsc_connected ); ?>>
                 <?php esc_html_e( 'Eksikleri Kontrol Et', 'hge' ); ?>
             </button>
         </div>
@@ -83,7 +83,7 @@
                             <td><?php echo esc_html( $row['last_crawl_time'] ?: '-' ); ?></td>
                             <td class="hge-index-checked"><?php echo esc_html( $row['last_checked'] ?: '-' ); ?></td>
                             <td>
-                                <button class="hge-btn hge-btn-secondary hge-btn-sm hge-index-check" type="button" <?php disabled( ! $gsc_connected ); ?>><?php esc_html_e( 'Kontrol Et', 'hge' ); ?></button>
+                                <button class="hge-btn hge-btn-secondary hge-btn-sm hge-index-check" type="button" data-loading-text="<?php esc_attr_e( 'Kontrol...', 'hge' ); ?>" <?php disabled( ! $gsc_connected ); ?>><?php esc_html_e( 'Kontrol Et', 'hge' ); ?></button>
                                 <?php if ( ! empty( $row['inspection_link'] ) ): ?>
                                     <a class="hge-btn hge-btn-sm" target="_blank" href="<?php echo esc_url( $row['inspection_link'] ); ?>"><?php esc_html_e( 'GSC’de Aç', 'hge' ); ?></a>
                                 <?php endif; ?>

@@ -5,6 +5,9 @@ defined( 'ABSPATH' ) || exit;
 
 class IndexStatus {
 
+    private const INDEXED_RECHECK_DAYS = 14;
+    private const RECENT_RECHECK_HOURS = 12;
+
     private \HGE\DB\Repository $repo;
 
     public function __construct() {
@@ -136,6 +139,7 @@ class IndexStatus {
     public function inspect_pending( int $limit = 5 ){
         $rows    = $this->get_data();
         $checked = [];
+        $skipped = 0;
         $limit   = max( 1, min( 50, $limit ) );
 
         foreach ( $rows as $row ) {
@@ -143,7 +147,8 @@ class IndexStatus {
                 break;
             }
 
-            if ( ! empty( $row['last_checked'] ) && ( $row['verdict'] ?? '' ) === 'PASS' ) {
+            if ( $this->should_skip_batch_check( $row ) ) {
+                $skipped++;
                 continue;
             }
 
@@ -155,7 +160,10 @@ class IndexStatus {
             ];
         }
 
-        return $checked;
+        return [
+            'checked' => $checked,
+            'skipped' => $skipped,
+        ];
     }
 
     public function queue_published_post( int $post_id ){
@@ -175,6 +183,23 @@ class IndexStatus {
             'orderby'        => 'modified',
             'order'          => 'DESC',
         ] );
+    }
+
+    private function should_skip_batch_check( array $row ){
+        if ( empty( $row['last_checked'] ) ) {
+            return false;
+        }
+
+        $last_checked = strtotime( (string) $row['last_checked'] );
+        if ( ! $last_checked ) {
+            return false;
+        }
+
+        if ( ( $row['verdict'] ?? '' ) === 'PASS' ) {
+            return $last_checked > strtotime( '-' . self::INDEXED_RECHECK_DAYS . ' days' );
+        }
+
+        return $last_checked > strtotime( '-' . self::RECENT_RECHECK_HOURS . ' hours' );
     }
 
     private function get_inspection_site_candidates( string $inspection_url, array $settings, \HGE\API\GSCClient $client ){

@@ -232,7 +232,9 @@ class Scheduler {
 
         $index_status = new \HGE\Admin\IndexStatus();
         $result       = $index_status->inspect_pending( 25 );
+        $checked      = $result['checked'] ?? [];
+        $skipped      = (int) ( $result['skipped'] ?? 0 );
         update_option( 'hge_last_index_status_sync', current_time( 'mysql' ) );
-        return [ count( $result ) . ' URL dizin durumu kontrol edildi.' ];
+        return [ count( $checked ) . ' URL dizin durumu kontrol edildi, ' . $skipped . ' URL atlandı.' ];
     }
 }

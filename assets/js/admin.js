@@ -24,7 +24,12 @@
     // -------------------------------------------------------------------------
     function ajaxRequest( action, extraData = {}, btnEl = null ) {
         if ( btnEl ) {
-            $( btnEl ).addClass( 'loading' ).prop( 'disabled', true )
+            const $btn = $( btnEl );
+            $btn.data( 'hge-original-text', $btn.text() );
+            if ( $btn.data( 'loading-text' ) ) {
+                $btn.text( $btn.data( 'loading-text' ) );
+            }
+            $btn.addClass( 'loading' ).prop( 'disabled', true )
                 .find( 'svg' ).css( 'animation', 'hge-spin .6s linear infinite' );
         }
         return $.ajax( {
@@ -33,7 +38,11 @@
             data   : Object.assign( { action, nonce: HGE.nonce }, extraData ),
         } ).always( () => {
             if ( btnEl ) {
-                $( btnEl ).removeClass( 'loading' ).prop( 'disabled', false )
+                const $btn = $( btnEl );
+                if ( $btn.data( 'hge-original-text' ) ) {
+                    $btn.text( $btn.data( 'hge-original-text' ) );
+                }
+                $btn.removeClass( 'loading' ).prop( 'disabled', false )
                     .find( 'svg' ).css( 'animation', '' );
             }
         } );

@@ -271,10 +271,13 @@ final class Plugin {
         $limit   = (int) ( $_POST['limit'] ?? 25 );
         $service = new \HGE\Admin\IndexStatus();
         $result  = $service->inspect_pending( $limit );
+        $checked = $result['checked'] ?? [];
+        $skipped = (int) ( $result['skipped'] ?? 0 );
 
         wp_send_json_success( [
-            'message' => sprintf( __( '%d URL kontrol edildi.', 'hge' ), count( $result ) ),
-            'items'   => $result,
+            'message' => sprintf( __( '%1$d URL kontrol edildi, %2$d URL atlandı.', 'hge' ), count( $checked ), $skipped ),
+            'items'   => $checked,
+            'skipped' => $skipped,
         ] );
     }
 
