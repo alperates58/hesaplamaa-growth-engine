@@ -30,6 +30,17 @@ function hge_pos_class( float $pos ): string {
             </div>
         </div>
         <div class="hge-header-right">
+            <div class="hge-range-switch" aria-label="<?php esc_attr_e( 'Dashboard veri araligi', 'hge' ); ?>">
+                <?php foreach ( $range_options as $range ): ?>
+                    <a
+                        href="<?php echo esc_url( add_query_arg( [ 'page' => 'hge-dashboard', 'hge_days' => $range ], admin_url( 'admin.php' ) ) ); ?>"
+                        class="hge-range-option <?php echo $selected_range === $range ? 'is-active' : ''; ?>"
+                        aria-current="<?php echo $selected_range === $range ? 'page' : 'false'; ?>"
+                    >
+                        <?php echo esc_html( sprintf( __( '%d gün', 'hge' ), $range ) ); ?>
+                    </a>
+                <?php endforeach; ?>
+            </div>
             <?php if ( ! $gsc_connected ): ?>
                 <a href="<?php echo esc_url( admin_url( 'admin.php?page=hge-settings' ) ); ?>" class="hge-btn hge-btn-warning">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -61,8 +72,21 @@ function hge_pos_class( float $pos ): string {
             [ 'label' => __( 'Düşen (30g)', 'hge' ), 'value' => number_format( $summary['falling_30d'] ?? 0 ), 'icon' => '<polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/>', 'color' => 'red', 'sub' => '' ],
             [ 'label' => __( 'Ort. CTR', 'hge' ), 'value' => ( ! empty( $summary['total_impressions'] ) ) ? number_format( ( $summary['total_clicks'] / $summary['total_impressions'] ) * 100, 2 ) . '%' : '—', 'icon' => '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>', 'color' => 'orange', 'sub' => '' ],
         ];
-        foreach ( $kpis as $kpi ): ?>
-        <div class="hge-kpi-card hge-kpi-<?php echo esc_attr( $kpi['color'] ); ?>">
+        $kpi_links = [
+            'blue'    => admin_url( 'admin.php?page=hge-opportunities' ),
+            'gold'    => admin_url( 'admin.php?page=hge-opportunities' ),
+            'purple'  => '#hge-position-chart',
+            'green'   => '#hge-clicks-chart',
+            'cyan'    => '#hge-clicks-chart',
+            'emerald' => admin_url( 'admin.php?page=hge-opportunities' ),
+            'red'     => admin_url( 'admin.php?page=hge-opportunities' ),
+            'orange'  => admin_url( 'admin.php?page=hge-page-analysis' ),
+        ];
+        foreach ( $kpis as $kpi ):
+            $href = $kpi_links[ $kpi['color'] ] ?? '';
+            $tag  = $href ? 'a' : 'div';
+        ?>
+        <<?php echo esc_attr( $tag ); ?> class="hge-kpi-card hge-kpi-<?php echo esc_attr( $kpi['color'] ); ?> <?php echo $href ? 'hge-kpi-link' : ''; ?>" <?php echo $href ? 'href="' . esc_url( $href ) . '"' : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
             <div class="hge-kpi-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><?php echo $kpi['icon']; // phpcs:ignore ?></svg>
             </div>
@@ -71,7 +95,7 @@ function hge_pos_class( float $pos ): string {
                 <span class="hge-kpi-value"><?php echo esc_html( $kpi['value'] ); ?></span>
                 <?php if ( $kpi['sub'] ): ?><span class="hge-kpi-sub"><?php echo esc_html( $kpi['sub'] ); ?></span><?php endif; ?>
             </div>
-        </div>
+        </<?php echo esc_attr( $tag ); ?>>
         <?php endforeach; ?>
     </div>
 
@@ -80,14 +104,14 @@ function hge_pos_class( float $pos ): string {
         <div class="hge-card hge-chart-card">
             <div class="hge-card-header">
                 <h3><?php esc_html_e( 'Günlük Tıklama & Gösterim', 'hge' ); ?></h3>
-                <span class="hge-badge"><?php esc_html_e( 'Son 30 Gün', 'hge' ); ?></span>
+                <span class="hge-badge"><?php echo esc_html( sprintf( __( 'Son %d gün', 'hge' ), $selected_range ) ); ?></span>
             </div>
             <div class="hge-card-body"><canvas id="hge-clicks-chart" height="280"></canvas></div>
         </div>
         <div class="hge-card hge-chart-card">
             <div class="hge-card-header">
                 <h3><?php esc_html_e( 'Ortalama Pozisyon Trendi', 'hge' ); ?></h3>
-                <span class="hge-badge"><?php esc_html_e( 'Son 30 Gün', 'hge' ); ?></span>
+                <span class="hge-badge"><?php echo esc_html( sprintf( __( 'Son %d gün', 'hge' ), $selected_range ) ); ?></span>
             </div>
             <div class="hge-card-body"><canvas id="hge-position-chart" height="280"></canvas></div>
         </div>
