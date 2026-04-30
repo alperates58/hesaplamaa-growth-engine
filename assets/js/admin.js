@@ -675,7 +675,7 @@
     } );
 
     $( '#hge-index-batch' ).on( 'click', function () {
-        ajaxRequest( 'hge_inspect_index_batch', { limit: 5 }, this )
+        ajaxRequest( 'hge_inspect_index_batch', { limit: 25 }, this )
             .done( res => {
                 if ( res.success ) {
                     toast( res.data.message || 'URL kontrolü tamamlandı.', 'success' );

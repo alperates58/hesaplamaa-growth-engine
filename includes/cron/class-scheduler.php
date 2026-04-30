@@ -231,7 +231,7 @@ class Scheduler {
         }
 
         $index_status = new \HGE\Admin\IndexStatus();
-        $result       = $index_status->inspect_pending( 10 );
+        $result       = $index_status->inspect_pending( 25 );
         update_option( 'hge_last_index_status_sync', current_time( 'mysql' ) );
         return [ count( $result ) . ' URL dizin durumu kontrol edildi.' ];
     }

@@ -27,7 +27,10 @@ class Settings {
 
         $clean['gsc_client_id']     = sanitize_text_field( $input['gsc_client_id'] ?? '' );
         $clean['gsc_client_secret'] = sanitize_text_field( $input['gsc_client_secret'] ?? '' );
-        $clean['gsc_site_url']      = esc_url_raw( $input['gsc_site_url'] ?? get_site_url() );
+        $site_url = trim( (string) ( $input['gsc_site_url'] ?? get_site_url() ) );
+        $clean['gsc_site_url'] = stripos( $site_url, 'sc-domain:' ) === 0
+            ? sanitize_text_field( $site_url )
+            : esc_url_raw( $site_url );
         $clean['data_range_days']   = max( 7, min( 90, (int) ( $input['data_range_days'] ?? 30 ) ) );
         $clean['cache_ttl']         = max( 300, min( 86400, (int) ( $input['cache_ttl'] ?? 3600 ) ) );
         $clean['google_ads_enabled']         = ! empty( $input['google_ads_enabled'] );

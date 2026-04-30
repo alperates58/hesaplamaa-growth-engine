@@ -112,7 +112,7 @@
                     <div class="hge-field">
                         <label for="hge_site_url"><?php esc_html_e( 'GSC Site URL', 'hge' ); ?></label>
                         <input
-                            type="url"
+                            type="text"
                             id="hge_site_url"
                             name="hge_settings[gsc_site_url]"
                             value="<?php echo esc_attr( $settings['gsc_site_url'] ?? get_site_url() ); ?>"

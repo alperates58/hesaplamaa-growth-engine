@@ -81,22 +81,35 @@ class IndexStatus {
 
     public function inspect_url( string $url, string $title = '', int $post_id = 0 ){
         $settings = get_option( 'hge_settings', [] );
-        $site_url = $settings['gsc_site_url'] ?? get_site_url();
         $client   = new \HGE\API\GSCClient();
 
         if ( ! $client->is_connected() ) {
             return new \WP_Error( 'hge_gsc_not_connected', __( 'GSC bağlı değil.', 'hge' ) );
         }
 
-        $result = $client->inspect_url( $site_url, $url, 'tr-TR' );
+        $result = null;
+        $last_error = null;
+        foreach ( $this->get_inspection_site_candidates( $url, $settings, $client ) as $site_url ) {
+            $result = $client->inspect_url( $site_url, $url, 'tr-TR' );
+            if ( ! is_wp_error( $result ) ) {
+                $this->remember_working_site_url( $site_url, $settings );
+                break;
+            }
+            $last_error = $result;
+        }
+
+        if ( $result === null ) {
+            $last_error = new \WP_Error( 'hge_no_gsc_property', __( 'Bu URL ile eşleşen GSC property bulunamadı.', 'hge' ) );
+        }
+
         if ( is_wp_error( $result ) ) {
             $this->repo->upsert_index_status( [
                 'page_url'      => $url,
                 'page_title'    => $title,
                 'post_id'       => $post_id,
-                'error_message' => $result->get_error_message(),
+                'error_message' => $last_error ? $last_error->get_error_message() : $result->get_error_message(),
             ] );
-            return $result;
+            return $last_error ?: $result;
         }
 
         $index = $result['indexStatusResult'] ?? [];
@@ -123,7 +136,7 @@ class IndexStatus {
     public function inspect_pending( int $limit = 5 ){
         $rows    = $this->get_data();
         $checked = [];
-        $limit   = max( 1, min( 10, $limit ) );
+        $limit   = max( 1, min( 50, $limit ) );
 
         foreach ( $rows as $row ) {
             if ( count( $checked ) >= $limit ) {
@@ -162,6 +175,70 @@ class IndexStatus {
             'orderby'        => 'modified',
             'order'          => 'DESC',
         ] );
+    }
+
+    private function get_inspection_site_candidates( string $inspection_url, array $settings, \HGE\API\GSCClient $client ){
+        $candidates = [];
+        $configured = trim( (string) ( $settings['gsc_site_url'] ?? '' ) );
+
+        foreach ( $this->expand_site_url_candidate( $configured ) as $candidate ) {
+            $candidates[] = $candidate;
+        }
+
+        $sites = $client->get_sites();
+        if ( ! is_wp_error( $sites ) ) {
+            foreach ( $sites as $site ) {
+                $site_url = $site['siteUrl'] ?? '';
+                if ( $this->site_matches_url( $site_url, $inspection_url ) ) {
+                    foreach ( $this->expand_site_url_candidate( $site_url ) as $candidate ) {
+                        $candidates[] = $candidate;
+                    }
+                }
+            }
+        }
+
+        foreach ( $this->expand_site_url_candidate( get_site_url() ) as $candidate ) {
+            $candidates[] = $candidate;
+        }
+
+        return array_values( array_unique( array_filter( $candidates ) ) );
+    }
+
+    private function expand_site_url_candidate( string $site_url ){
+        $site_url = trim( $site_url );
+        if ( $site_url === '' ) {
+            return [];
+        }
+
+        if ( stripos( $site_url, 'sc-domain:' ) === 0 ) {
+            return [ $site_url ];
+        }
+
+        return [ trailingslashit( $site_url ), untrailingslashit( $site_url ) ];
+    }
+
+    private function site_matches_url( string $site_url, string $inspection_url ){
+        if ( $site_url === '' ) {
+            return false;
+        }
+
+        if ( stripos( $site_url, 'sc-domain:' ) === 0 ) {
+            $domain = strtolower( substr( $site_url, 10 ) );
+            $host   = strtolower( (string) wp_parse_url( $inspection_url, PHP_URL_HOST ) );
+            $host   = preg_replace( '/^www\./i', '', $host );
+            return $host === $domain || substr( $host, -1 * ( strlen( $domain ) + 1 ) ) === '.' . $domain;
+        }
+
+        return strpos( trailingslashit( $inspection_url ), trailingslashit( $site_url ) ) === 0;
+    }
+
+    private function remember_working_site_url( string $site_url, array $settings ){
+        if ( empty( $site_url ) || ( $settings['gsc_site_url'] ?? '' ) === $site_url ) {
+            return;
+        }
+
+        $settings['gsc_site_url'] = $site_url;
+        update_option( 'hge_settings', $settings );
     }
 
     private function format_row_for_response( array $row ){

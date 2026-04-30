@@ -268,7 +268,7 @@ final class Plugin {
     public function ajax_inspect_index_batch(){
         $this->verify_ajax_request();
 
-        $limit   = (int) ( $_POST['limit'] ?? 5 );
+        $limit   = (int) ( $_POST['limit'] ?? 25 );
         $service = new \HGE\Admin\IndexStatus();
         $result  = $service->inspect_pending( $limit );
 
