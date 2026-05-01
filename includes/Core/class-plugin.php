@@ -246,6 +246,7 @@ final class Plugin {
         wp_send_json_success( [
             'message' => __( 'AI genel hesaplama fikirleri eklendi.', 'hge' ),
             'count'   => count( $result ),
+            'items'   => array_slice( $result, 0, 200 ),
         ] );
     }
 

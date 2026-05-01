@@ -15,7 +15,8 @@ class NewIdeas {
 
     public function get_data(){
         // Önce DB'den bak
-        $cached = $this->repo->get_suggestions( 200 );
+        $preferred_source = sanitize_text_field( get_option( 'hge_suggestions_preferred_source', '' ) );
+        $cached = $this->repo->get_suggestions( 200, $preferred_source );
         if ( ! empty( $cached ) ) {
             return $cached;
         }
@@ -44,6 +45,8 @@ class NewIdeas {
                 'source'           => $item['seed_source'] ?? 'google_suggest',
             ] );
         }
+
+        delete_option( 'hge_suggestions_preferred_source' );
 
         return $this->repo->get_suggestions( 200 );
     }
@@ -122,7 +125,9 @@ class NewIdeas {
             ] );
         }
 
-        return $this->repo->get_suggestions( 200 );
+        update_option( 'hge_suggestions_preferred_source', 'ai_topic', false );
+
+        return $this->repo->get_suggestions( 200, 'ai_topic' );
     }
 
     public function generate_global_ideas(){
@@ -199,7 +204,9 @@ class NewIdeas {
             ] );
         }
 
-        return $this->repo->get_suggestions( 200 );
+        update_option( 'hge_suggestions_preferred_source', 'ai_global', false );
+
+        return $this->repo->get_suggestions( 200, 'ai_global' );
     }
 
     private function normalize_keyword_key( string $keyword ){

@@ -276,15 +276,35 @@ class Repository {
         );
     }
 
-    public function get_suggestions( int $limit = 100 ){
+    public function get_suggestions( int $limit = 100, string $preferred_source = '' ){
+        $preferred_source = sanitize_text_field( $preferred_source );
+
+        if ( $preferred_source !== '' ) {
+            return $this->wpdb->get_results(
+                $this->wpdb->prepare(
+                    "SELECT * FROM {$this->suggestions}
+                     ORDER BY
+                        CASE WHEN source = %s THEN 0 ELSE 1 END ASC,
+                        opportunity_score DESC,
+                        monthly_volume DESC,
+                        id DESC
+                     LIMIT %d",
+                    $preferred_source,
+                    $limit
+                ),
+                ARRAY_A
+            ) ?: [];
+        }
+
         return $this->wpdb->get_results(
             $this->wpdb->prepare(
                 "SELECT * FROM {$this->suggestions}
                  ORDER BY
                     CASE
-                        WHEN source = 'ai_topic' THEN 0
-                        WHEN source = 'ai_seed_google_suggest' THEN 1
-                        ELSE 2
+                        WHEN source = 'ai_global' THEN 0
+                        WHEN source = 'ai_topic' THEN 1
+                        WHEN source = 'ai_seed_google_suggest' THEN 2
+                        ELSE 3
                     END ASC,
                     opportunity_score DESC,
                     monthly_volume DESC,
