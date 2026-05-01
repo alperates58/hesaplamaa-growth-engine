@@ -97,10 +97,15 @@ class NewIdeas {
         }
 
         $enriched = $this->suggest->enrich_with_site_data( array_values( $merged ) );
+        $metrics  = $this->suggest->get_ai_metric_estimates( array_column( $enriched, 'keyword' ) );
 
         foreach ( $enriched as $index => $item ) {
             $key      = $this->normalize_keyword_key( $item['keyword'] ?? '' );
             $ai_score = (int) ( $merged[ $key ]['opportunity_score'] ?? 0 );
+            if ( isset( $metrics[ $item['keyword'] ] ) ) {
+                $item['monthly_volume'] = (int) $metrics[ $item['keyword'] ]['monthly_volume'];
+                $item['competition']    = $metrics[ $item['keyword'] ]['competition'];
+            }
             if ( $ai_score > 0 ) {
                 $item['opportunity_score'] = $ai_score;
                 $item['should_create'] = ( ! $item['exists_on_site'] && $ai_score >= 60 ) ? 1 : 0;

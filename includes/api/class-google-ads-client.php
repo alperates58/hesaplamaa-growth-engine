@@ -5,7 +5,7 @@ defined( 'ABSPATH' ) || exit;
 
 class GoogleAdsClient {
 
-    const API_VERSION = 'v22';
+    const API_VERSION = 'v24';
 
     private array $settings;
     private string $last_error = '';
@@ -62,7 +62,10 @@ class GoogleAdsClient {
         ];
 
         if ( ! empty( $this->settings['google_ads_login_customer_id'] ) ) {
-            $headers['login-customer-id'] = preg_replace( '/\D+/', '', (string) $this->settings['google_ads_login_customer_id'] );
+            $login_customer_id = preg_replace( '/\D+/', '', (string) $this->settings['google_ads_login_customer_id'] );
+            if ( $login_customer_id !== '' && $login_customer_id !== $customer_id ) {
+                $headers['login-customer-id'] = $login_customer_id;
+            }
         }
 
         $body = [
@@ -71,11 +74,27 @@ class GoogleAdsClient {
         ];
 
         if ( ! empty( $this->settings['google_ads_language'] ) ) {
-            $body['language'] = sanitize_text_field( $this->settings['google_ads_language'] );
+            $language = $this->normalize_resource_name(
+                (string) $this->settings['google_ads_language'],
+                'languageConstants'
+            );
+            if ( is_wp_error( $language ) ) {
+                $this->last_error = $language->get_error_message();
+                return [];
+            }
+            $body['language'] = $language;
         }
 
         if ( ! empty( $this->settings['google_ads_geo_target'] ) ) {
-            $body['geoTargetConstants'] = [ sanitize_text_field( $this->settings['google_ads_geo_target'] ) ];
+            $geo_target = $this->normalize_resource_name(
+                (string) $this->settings['google_ads_geo_target'],
+                'geoTargetConstants'
+            );
+            if ( is_wp_error( $geo_target ) ) {
+                $this->last_error = $geo_target->get_error_message();
+                return [];
+            }
+            $body['geoTargetConstants'] = [ $geo_target ];
         }
 
         $response = wp_remote_post( $url, [
@@ -93,7 +112,7 @@ class GoogleAdsClient {
         $data = json_decode( (string) wp_remote_retrieve_body( $response ), true );
 
         if ( $code < 200 || $code >= 300 || ! is_array( $data ) ) {
-            $this->last_error = $data['error']['message'] ?? sprintf( __( 'Google Ads API HTTP %d hatası döndürdü.', 'hge' ), $code );
+            $this->last_error = $this->format_api_error( $data, $code );
             return [];
         }
 
@@ -183,5 +202,57 @@ class GoogleAdsClient {
         set_transient( $cache_key, (string) $data['access_token'], $ttl );
 
         return (string) $data['access_token'];
+    }
+
+    private function normalize_resource_name( string $value, string $prefix ){
+        $value = trim( sanitize_text_field( $value ) );
+        if ( $value === '' ) {
+            return '';
+        }
+
+        if ( preg_match( '#^' . preg_quote( $prefix, '#' ) . '/\d+$#', $value ) ) {
+            return $value;
+        }
+
+        if ( preg_match( '/^\d+$/', $value ) ) {
+            return $prefix . '/' . $value;
+        }
+
+        return new \WP_Error(
+            'hge_ads_invalid_resource_name',
+            sprintf(
+                __( 'Google Ads %1$s alanı geçersiz. Sadece ID veya "%1$s/1234" formatı kullanın.', 'hge' ),
+                $prefix
+            )
+        );
+    }
+
+    private function format_api_error( $data, int $code ): string {
+        $message = is_array( $data ) && ! empty( $data['error']['message'] )
+            ? (string) $data['error']['message']
+            : sprintf( __( 'Google Ads API HTTP %d hatası döndürdü.', 'hge' ), $code );
+
+        $details = [];
+        foreach ( (array) ( $data['error']['details'] ?? [] ) as $detail ) {
+            foreach ( (array) ( $detail['errors'] ?? [] ) as $error ) {
+                if ( ! empty( $error['message'] ) ) {
+                    $details[] = sanitize_text_field( $error['message'] );
+                }
+                if ( ! empty( $error['errorCode'] ) && is_array( $error['errorCode'] ) ) {
+                    foreach ( $error['errorCode'] as $type => $reason ) {
+                        $details[] = sanitize_text_field( $type . ': ' . $reason );
+                    }
+                }
+            }
+            if ( ! empty( $detail['requestId'] ) ) {
+                $details[] = 'requestId: ' . sanitize_text_field( $detail['requestId'] );
+            }
+        }
+
+        if ( ! empty( $details ) ) {
+            $message .= ' ' . implode( ' | ', array_unique( $details ) );
+        }
+
+        return $message;
     }
 }

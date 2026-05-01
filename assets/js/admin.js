@@ -25,7 +25,7 @@
     function ajaxRequest( action, extraData = {}, btnEl = null ) {
         if ( btnEl ) {
             const $btn = $( btnEl );
-            $btn.data( 'hge-original-text', $btn.text() );
+            $btn.data( 'hge-original-html', $btn.html() );
             if ( $btn.data( 'loading-text' ) ) {
                 $btn.text( $btn.data( 'loading-text' ) );
             }
@@ -39,8 +39,8 @@
         } ).always( () => {
             if ( btnEl ) {
                 const $btn = $( btnEl );
-                if ( $btn.data( 'hge-original-text' ) ) {
-                    $btn.text( $btn.data( 'hge-original-text' ) );
+                if ( $btn.data( 'hge-original-html' ) ) {
+                    $btn.html( $btn.data( 'hge-original-html' ) );
                 }
                 $btn.removeClass( 'loading' ).prop( 'disabled', false )
                     .find( 'svg' ).css( 'animation', '' );
