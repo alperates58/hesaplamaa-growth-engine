@@ -105,6 +105,7 @@
                             $competition = strtoupper( (string) ( $row['competition'] ?? 'UNKNOWN' ) );
                             $score       = (int) ( $row['opportunity_score'] ?? 0 );
                             $exists      = ! empty( $row['exists_on_site'] );
+                            $created_ts  = ! empty( $row['created_at'] ) ? strtotime( (string) $row['created_at'] ) : 0;
                             $comp_labels = [ 'LOW' => 'Düşük', 'MEDIUM' => 'Orta', 'HIGH' => 'Yüksek', 'UNKNOWN' => 'Bilinmiyor' ];
                             ?>
                             <tr>
@@ -114,9 +115,9 @@
                                         <span class="hge-badge hge-badge-warning"><?php esc_html_e( 'Üret', 'hge' ); ?></span>
                                     <?php endif; ?>
                                 </td>
-                                <td><?php echo esc_html( number_format_i18n( (int) ( $row['monthly_volume'] ?? 0 ) ) ); ?></td>
+                                <td data-sort-value="<?php echo esc_attr( (int) ( $row['monthly_volume'] ?? 0 ) ); ?>"><?php echo esc_html( number_format_i18n( (int) ( $row['monthly_volume'] ?? 0 ) ) ); ?></td>
                                 <td><span class="hge-competition hge-competition-<?php echo esc_attr( strtolower( $competition ) ); ?>"><?php echo esc_html( $comp_labels[ $competition ] ?? $competition ); ?></span></td>
-                                <td>
+                                <td data-sort-value="<?php echo esc_attr( $score ); ?>">
                                     <div class="hge-score-cell">
                                         <strong><?php echo esc_html( $score ); ?></strong>
                                         <span><i style="width:<?php echo esc_attr( min( 100, max( 0, $score ) ) ); ?>%"></i></span>
@@ -124,7 +125,7 @@
                                 </td>
                                 <td><?php echo $exists ? esc_html__( 'Var', 'hge' ) : esc_html__( 'Yok', 'hge' ); ?></td>
                                 <td><code><?php echo esc_html( $row['source'] ?? '' ); ?></code></td>
-                                <td><?php echo esc_html( $row['created_at'] ?? '-' ); ?></td>
+                                <td data-sort-value="<?php echo esc_attr( $created_ts ?: 0 ); ?>"><?php echo esc_html( $row['created_at'] ?? '-' ); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

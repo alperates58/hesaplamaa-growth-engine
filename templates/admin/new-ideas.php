@@ -165,7 +165,7 @@ $archive_today_url        = add_query_arg( 'hge_created', 'today', $archive_url 
                             </div>
 
                             <button class="hge-idea-card-action" type="button"><?php esc_html_e( 'Detayı aç', 'hge' ); ?></button>
-                        </a>
+                        </article>
                     <?php endforeach; ?>
                 </div>
 

@@ -63,8 +63,8 @@ class Menu {
             ],
             [
                 'parent' => 'hge-dashboard',
-                'title'  => __( 'Fikir ArÅŸivi', 'hge' ),
-                'menu'   => __( 'Fikir ArÅŸivi', 'hge' ),
+                'title'  => __( 'Fikir Arşivi', 'hge' ),
+                'menu'   => __( 'Fikir Arşivi', 'hge' ),
                 'slug'   => 'hge-suggestion-archive',
                 'cb'     => [ $this, 'render_suggestion_archive' ],
             ],

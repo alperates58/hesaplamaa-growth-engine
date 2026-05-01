@@ -736,11 +736,37 @@
         const $tbody = $table.find( 'tbody' );
         const idx    = $th.index();
 
+        const getSortValue = function ( row ) {
+            const $cell = $( row ).find( 'td' ).eq( idx );
+            const explicit = $cell.attr( 'data-sort-value' );
+            return explicit !== undefined && explicit !== '' ? explicit : $cell.text().trim();
+        };
+
+        const parseSortNumber = function ( value ) {
+            let normalized = value
+                .toString()
+                .trim()
+                .replace( /\s/g, '' )
+                .replace( /[^0-9.,-]/g, '' );
+
+            if ( normalized.indexOf( ',' ) !== -1 ) {
+                normalized = normalized.replace( /\./g, '' ).replace( /,/g, '.' );
+            } else if ( ( normalized.match( /\./g ) || [] ).length > 1 || /^\d{1,3}(\.\d{3})+$/.test( normalized ) ) {
+                normalized = normalized.replace( /\./g, '' );
+            }
+
+            if ( normalized === '' || normalized === '-' ) {
+                return NaN;
+            }
+
+            return Number( normalized );
+        };
+
         $tbody.find( 'tr' ).sort( function ( a, b ) {
-            const aVal = $( a ).find( 'td' ).eq( idx ).text().trim();
-            const bVal = $( b ).find( 'td' ).eq( idx ).text().trim();
-            const aNum = parseFloat( aVal.replace( /[^0-9.-]/g, '' ) );
-            const bNum = parseFloat( bVal.replace( /[^0-9.-]/g, '' ) );
+            const aVal = getSortValue( a );
+            const bVal = getSortValue( b );
+            const aNum = parseSortNumber( aVal );
+            const bNum = parseSortNumber( bVal );
 
             if ( ! isNaN( aNum ) && ! isNaN( bNum ) ) {
                 return asc ? aNum - bNum : bNum - aNum;
