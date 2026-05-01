@@ -373,7 +373,7 @@ class OpenAIClient {
             return new \WP_Error( 'hge_openai_limit', __( 'Günlük AI analiz limiti doldu.', 'hge' ) );
         }
 
-        $cache_key = 'hge_ai_calculator_universe_v1';
+        $cache_key = 'hge_ai_calculator_universe_v2';
         $cached    = get_transient( $cache_key );
         if ( is_array( $cached ) && ! empty( $cached ) ) {
             return $cached;
@@ -516,7 +516,7 @@ class OpenAIClient {
         return $ideas;
     }
 
-    private function fallback_global_ideas(){
+    public function fallback_global_ideas(){
         $keywords = [
             [ 'kredi hesaplama', 'finans' ],
             [ 'ihtiyaç kredisi hesaplama', 'finans' ],

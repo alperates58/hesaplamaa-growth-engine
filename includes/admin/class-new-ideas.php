@@ -138,9 +138,10 @@ class NewIdeas {
 
         $ideas = $client->generate_calculator_universe_ideas();
         if ( is_wp_error( $ideas ) ) {
-            return $ideas;
+            $ideas = $client->fallback_global_ideas();
         }
 
+        $this->repo->delete_suggestions_by_source( 'ai_topic' );
         $this->repo->delete_suggestions_by_source( 'ai_global' );
 
         $merged = [];
@@ -153,32 +154,38 @@ class NewIdeas {
             $merged[ $this->normalize_keyword_key( $keyword ) ] = [
                 'keyword'           => $keyword,
                 'seed'              => sanitize_text_field( $idea['category'] ?? 'genel' ),
-                'seed_source'       => 'ai_global',
+                'seed_source'       => 'ai_topic',
                 'monthly_volume'    => (int) ( $idea['monthly_volume'] ?? 0 ),
                 'competition'       => sanitize_text_field( $idea['competition'] ?? 'MEDIUM' ),
                 'opportunity_score' => (int) ( $idea['opportunity_score'] ?? 70 ),
             ];
         }
 
-        foreach ( $this->suggest->get_all_suggestions() as $suggestion ) {
-            $keyword = sanitize_text_field( $suggestion['keyword'] ?? '' );
-            if ( $keyword === '' ) {
-                continue;
-            }
+        foreach ( $this->get_global_discovery_topics() as $topic ) {
+            foreach ( $this->suggest->get_topic_suggestions( $topic, 12 ) as $suggestion ) {
+                $keyword = sanitize_text_field( $suggestion['keyword'] ?? '' );
+                if ( $keyword === '' ) {
+                    continue;
+                }
 
-            $key = $this->normalize_keyword_key( $keyword );
-            if ( isset( $merged[ $key ] ) ) {
-                continue;
-            }
+                $key = $this->normalize_keyword_key( $keyword );
+                if ( isset( $merged[ $key ] ) ) {
+                    continue;
+                }
 
-            $merged[ $key ] = [
-                'keyword'     => $keyword,
-                'seed'        => sanitize_text_field( $suggestion['seed'] ?? 'genel' ),
-                'seed_source' => 'ai_global',
-            ];
+                $merged[ $key ] = [
+                    'keyword'     => $keyword,
+                    'seed'        => sanitize_text_field( $suggestion['seed'] ?? $topic ),
+                    'seed_source' => 'ai_topic',
+                ];
+            }
         }
 
         $enriched = $this->suggest->enrich_with_site_data( array_values( $merged ) );
+        if ( empty( $enriched ) ) {
+            return new \WP_Error( 'hge_ai_global_empty', __( 'AI genel keşif sonucunda fırsat üretilemedi.', 'hge' ) );
+        }
+
         $metrics  = $this->suggest->get_ai_metric_estimates( array_column( $enriched, 'keyword' ) );
 
         foreach ( $enriched as $item ) {
@@ -200,13 +207,28 @@ class NewIdeas {
                 'opportunity_score' => (int) $item['opportunity_score'],
                 'exists_on_site'    => (int) $item['exists_on_site'],
                 'should_create'     => (int) $item['should_create'],
-                'source'            => 'ai_global',
+                'source'            => 'ai_topic',
             ] );
         }
 
-        update_option( 'hge_suggestions_preferred_source', 'ai_global', false );
+        update_option( 'hge_suggestions_preferred_source', 'ai_topic', false );
 
-        return $this->repo->get_suggestions( 200, 'ai_global' );
+        return $this->repo->get_suggestions( 200, 'ai_topic' );
+    }
+
+    private function get_global_discovery_topics(){
+        return [
+            'finans',
+            'maaş',
+            'vergi',
+            'sgk',
+            'sağlık',
+            'zaman',
+            'eğitim',
+            'araç',
+            'inşaat',
+            'enerji',
+        ];
     }
 
     private function normalize_keyword_key( string $keyword ){
