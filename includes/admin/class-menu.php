@@ -63,6 +63,13 @@ class Menu {
             ],
             [
                 'parent' => 'hge-dashboard',
+                'title'  => __( 'Fikir ArÅŸivi', 'hge' ),
+                'menu'   => __( 'Fikir ArÅŸivi', 'hge' ),
+                'slug'   => 'hge-suggestion-archive',
+                'cb'     => [ $this, 'render_suggestion_archive' ],
+            ],
+            [
+                'parent' => 'hge-dashboard',
                 'title'  => __( 'Search Console Ayarları', 'hge' ),
                 'menu'   => __( 'GSC Ayarları', 'hge' ),
                 'slug'   => 'hge-settings',
@@ -121,6 +128,10 @@ class Menu {
 
     public function render_new_ideas(){
         ( new NewIdeas() )->render();
+    }
+
+    public function render_suggestion_archive(){
+        ( new SuggestionArchive() )->render();
     }
 
     public function render_settings(){

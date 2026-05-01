@@ -316,6 +316,84 @@ class Repository {
         ) ?: [];
     }
 
+    public function get_suggestion_archive( array $filters = [] ){
+        $limit       = max( 20, min( 500, (int) ( $filters['limit'] ?? 300 ) ) );
+        $search      = sanitize_text_field( $filters['search'] ?? '' );
+        $source      = sanitize_text_field( $filters['source'] ?? '' );
+        $competition = strtoupper( sanitize_text_field( $filters['competition'] ?? '' ) );
+        $status      = sanitize_text_field( $filters['status'] ?? '' );
+        $created     = sanitize_text_field( $filters['created'] ?? '' );
+
+        $where  = [ '1=1' ];
+        $params = [];
+
+        if ( $search !== '' ) {
+            $where[]  = 'topic LIKE %s';
+            $params[] = '%' . $this->wpdb->esc_like( $search ) . '%';
+        }
+
+        if ( $source !== '' ) {
+            $where[]  = 'source = %s';
+            $params[] = $source;
+        }
+
+        if ( in_array( $competition, [ 'LOW', 'MEDIUM', 'HIGH', 'UNKNOWN' ], true ) ) {
+            $where[]  = 'UPPER(competition) = %s';
+            $params[] = $competition;
+        }
+
+        if ( $status === 'missing' ) {
+            $where[] = 'exists_on_site = 0';
+        } elseif ( $status === 'existing' ) {
+            $where[] = 'exists_on_site = 1';
+        } elseif ( $status === 'should_create' ) {
+            $where[] = 'should_create = 1';
+        }
+
+        if ( $created === 'today' ) {
+            $where[] = 'DATE(created_at) = CURDATE()';
+        }
+
+        $sql = "SELECT * FROM {$this->suggestions}
+                WHERE " . implode( ' AND ', $where ) . "
+                ORDER BY opportunity_score DESC, monthly_volume DESC, id DESC
+                LIMIT %d";
+        $params[] = $limit;
+
+        return $this->wpdb->get_results(
+            $this->wpdb->prepare( $sql, $params ),
+            ARRAY_A
+        ) ?: [];
+    }
+
+    public function get_suggestion_archive_summary(){
+        $row = $this->wpdb->get_row(
+            "SELECT
+                COUNT(*) total,
+                SUM(CASE WHEN exists_on_site = 0 THEN 1 ELSE 0 END) missing,
+                SUM(CASE WHEN should_create = 1 THEN 1 ELSE 0 END) should_create,
+                MAX(created_at) latest_created
+             FROM {$this->suggestions}",
+            ARRAY_A
+        ) ?: [];
+
+        $sources = $this->wpdb->get_results(
+            "SELECT source, COUNT(*) count
+             FROM {$this->suggestions}
+             GROUP BY source
+             ORDER BY count DESC, source ASC",
+            ARRAY_A
+        ) ?: [];
+
+        return [
+            'total'          => (int) ( $row['total'] ?? 0 ),
+            'missing'        => (int) ( $row['missing'] ?? 0 ),
+            'should_create'  => (int) ( $row['should_create'] ?? 0 ),
+            'latest_created' => $row['latest_created'] ?? '',
+            'sources'        => $sources,
+        ];
+    }
+
     public function get_ai_insight( string $keyword ){
         $row = $this->wpdb->get_row(
             $this->wpdb->prepare(

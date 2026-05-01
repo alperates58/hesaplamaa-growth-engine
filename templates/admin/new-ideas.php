@@ -26,6 +26,11 @@ foreach ( $suggestions as $item ) {
 if ( $today_count === 0 && $total_count > 0 ) {
     $today_count = min( 12, $total_count );
 }
+
+$archive_url              = admin_url( 'admin.php?page=hge-suggestion-archive' );
+$archive_missing_url      = add_query_arg( 'hge_status', 'missing', $archive_url );
+$archive_quick_url        = add_query_arg( 'hge_status', 'should_create', $archive_url );
+$archive_today_url        = add_query_arg( 'hge_created', 'today', $archive_url );
 ?>
 <div class="hge-wrap hge-ideas-app">
     <section class="hge-ideas-hero">
@@ -41,26 +46,26 @@ if ( $today_count === 0 && $total_count > 0 ) {
     </section>
 
     <section class="hge-ideas-metrics" aria-label="<?php esc_attr_e( 'Fırsat özeti', 'hge' ); ?>">
-        <article class="hge-ideas-metric">
+        <a class="hge-ideas-metric" href="<?php echo esc_url( $archive_url ); ?>">
             <span><?php esc_html_e( 'Toplam fırsat', 'hge' ); ?></span>
             <strong><?php echo esc_html( number_format_i18n( $total_count ) ); ?></strong>
             <em><?php esc_html_e( 'Analize hazır konu', 'hge' ); ?></em>
-        </article>
-        <article class="hge-ideas-metric">
+        </a>
+        <a class="hge-ideas-metric" href="<?php echo esc_url( $archive_missing_url ); ?>">
             <span><?php esc_html_e( 'Sitede olmayanlar', 'hge' ); ?></span>
             <strong><?php echo esc_html( number_format_i18n( $missing_count ) ); ?></strong>
             <em><?php esc_html_e( 'Yeni sayfa adayı', 'hge' ); ?></em>
-        </article>
-        <article class="hge-ideas-metric">
+        </a>
+        <a class="hge-ideas-metric" href="<?php echo esc_url( $archive_quick_url ); ?>">
             <span><?php esc_html_e( 'Hızlı kazanılacaklar', 'hge' ); ?></span>
             <strong><?php echo esc_html( number_format_i18n( $quick_win_count ) ); ?></strong>
             <em><?php esc_html_e( 'Öncelikli üretim', 'hge' ); ?></em>
-        </article>
-        <article class="hge-ideas-metric">
+        </a>
+        <a class="hge-ideas-metric" href="<?php echo esc_url( $archive_today_url ); ?>">
             <span><?php esc_html_e( 'Bugün keşfedilenler', 'hge' ); ?></span>
             <strong><?php echo esc_html( number_format_i18n( $today_count ) ); ?></strong>
             <em><?php esc_html_e( 'Taze sinyal', 'hge' ); ?></em>
-        </article>
+        </a>
     </section>
 
     <section class="hge-ideas-workspace">
@@ -160,7 +165,7 @@ if ( $today_count === 0 && $total_count > 0 ) {
                             </div>
 
                             <button class="hge-idea-card-action" type="button"><?php esc_html_e( 'Detayı aç', 'hge' ); ?></button>
-                        </article>
+                        </a>
                     <?php endforeach; ?>
                 </div>
 
