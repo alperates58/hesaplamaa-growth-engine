@@ -207,8 +207,8 @@
                     </div>
                     <div class="hge-field">
                         <label for="hge_google_ads_language"><?php esc_html_e( 'Dil', 'hge' ); ?></label>
-                        <input id="hge_google_ads_language" name="hge_settings[google_ads_language]" class="hge-input" type="text" value="<?php echo esc_attr( $settings['google_ads_language'] ?? 'languageConstants/1055' ); ?>">
-                        <small class="hge-field-hint"><?php esc_html_e( 'Varsayılan Türkçe: languageConstants/1055', 'hge' ); ?></small>
+                        <input id="hge_google_ads_language" name="hge_settings[google_ads_language]" class="hge-input" type="text" value="<?php echo esc_attr( $settings['google_ads_language'] ?? 'languageConstants/1037' ); ?>">
+                        <small class="hge-field-hint"><?php esc_html_e( 'Varsayılan Türkçe: languageConstants/1037', 'hge' ); ?></small>
                     </div>
                     <div class="hge-field">
                         <label for="hge_google_ads_geo_target"><?php esc_html_e( 'Lokasyon', 'hge' ); ?></label>

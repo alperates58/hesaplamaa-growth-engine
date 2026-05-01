@@ -38,7 +38,7 @@ class Settings {
         $clean['google_ads_customer_id']     = preg_replace( '/\D+/', '', (string) ( $input['google_ads_customer_id'] ?? '' ) );
         $clean['google_ads_login_customer_id'] = preg_replace( '/\D+/', '', (string) ( $input['google_ads_login_customer_id'] ?? '' ) );
         $clean['google_ads_refresh_token']   = sanitize_text_field( $input['google_ads_refresh_token'] ?? '' );
-        $clean['google_ads_language']        = sanitize_text_field( $input['google_ads_language'] ?? 'languageConstants/1055' );
+        $clean['google_ads_language']        = sanitize_text_field( $input['google_ads_language'] ?? 'languageConstants/1037' );
         $clean['google_ads_geo_target']      = sanitize_text_field( $input['google_ads_geo_target'] ?? 'geoTargetConstants/2792' );
 
         // Mevcut bağlantı durumunu koru

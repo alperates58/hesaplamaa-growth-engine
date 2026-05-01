@@ -210,6 +210,10 @@ class GoogleAdsClient {
             return '';
         }
 
+        if ( $prefix === 'languageConstants' && in_array( $value, [ '1055', 'languageConstants/1055' ], true ) ) {
+            $value = 'languageConstants/1037';
+        }
+
         if ( preg_match( '#^' . preg_quote( $prefix, '#' ) . '/\d+$#', $value ) ) {
             return $value;
         }
