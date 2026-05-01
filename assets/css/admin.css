@@ -1384,6 +1384,7 @@ input[type="submit"].hge-btn { height: auto; padding: 10px 24px; }
 
 .hge-topic-discovery {
     display: flex;
+    flex-wrap: wrap;
     flex: 1.1;
     min-width: 320px;
     padding: 4px;
@@ -1395,7 +1396,7 @@ input[type="submit"].hge-btn { height: auto; padding: 10px 24px; }
 
 .hge-topic-discovery input {
     flex: 1;
-    min-width: 0;
+    min-width: 180px;
     border: 0;
     padding: 10px 12px;
     background: transparent;

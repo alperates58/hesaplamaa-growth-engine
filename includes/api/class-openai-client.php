@@ -362,6 +362,106 @@ class OpenAIClient {
         return $ideas;
     }
 
+    public function generate_calculator_universe_ideas(){
+        $settings = $this->get_settings();
+
+        if ( empty( $settings['api_key'] ) ) {
+            return new \WP_Error( 'hge_openai_missing_key', __( 'OpenAI API key tanımlı değil.', 'hge' ) );
+        }
+
+        if ( ! $this->has_daily_quota() ) {
+            return new \WP_Error( 'hge_openai_limit', __( 'Günlük AI analiz limiti doldu.', 'hge' ) );
+        }
+
+        $cache_key = 'hge_ai_calculator_universe_v1';
+        $cached    = get_transient( $cache_key );
+        if ( is_array( $cached ) && ! empty( $cached ) ) {
+            return $cached;
+        }
+
+        $model = sanitize_text_field( $settings['model'] ?: 'gpt-5-mini' );
+
+        $response = wp_remote_post( 'https://api.openai.com/v1/responses', [
+            'timeout' => 45,
+            'headers' => [
+                'Authorization' => 'Bearer ' . $settings['api_key'],
+                'Content-Type'  => 'application/json',
+            ],
+            'body' => wp_json_encode( [
+                'model' => $model,
+                'input' => [
+                    [
+                        'role' => 'system',
+                        'content' => 'Sen Türkiye pazarı için SEO odaklı hesaplama aracı fırsatları bulan bir ürün stratejistisin. Sadece geçerli JSON döndür.',
+                    ],
+                    [
+                        'role' => 'user',
+                        'content' => 'hesaplamaa.com için kategori sormadan, tüm hesaplama aracı evreninden 80 gerçek keyword öner. Finans, maaş, vergi, SGK, emeklilik, kredi, yatırım, sağlık, gebelik, kilo, zaman, tarih, eğitim, not, sınav, ölçü birimi, inşaat, araç, yakıt, enerji, hukuk, resmi işlem, e-ticaret ve günlük hayat alanlarını kapsa. Her keyword doğal Türkçe arama sorgusu olsun; tercihen "... hesaplama", "... hesaplayıcı", "kaç gün", "ne kadar" gibi net hesaplama niyeti taşısın. Marka adı, haber konusu ve hesaplama aracı olmayan genel makale fikri üretme. Türkiye pazarı için aylık hacim tahmini, rekabet ve fırsat skoru ver. competition sadece LOW, MEDIUM, HIGH olabilir. JSON: {"ideas":[{"keyword":"...","category":"finans","monthly_volume":1000,"competition":"MEDIUM","opportunity_score":80,"reason":"..."}]}',
+                    ],
+                ],
+                'max_output_tokens' => 5000,
+                'text' => [
+                    'format' => [
+                        'type' => 'json_object',
+                    ],
+                ],
+            ], JSON_UNESCAPED_UNICODE ),
+        ] );
+
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+
+        $code = (int) wp_remote_retrieve_response_code( $response );
+        $body = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+
+        if ( $code < 200 || $code >= 300 ) {
+            $message = $body['error']['message'] ?? __( 'OpenAI isteği başarısız oldu.', 'hge' );
+            return new \WP_Error( 'hge_openai_error', $message );
+        }
+
+        $text = $this->extract_output_text( is_array( $body ) ? $body : [] );
+        $data = $this->decode_json_text( $text );
+        $ideas = [];
+
+        $raw_ideas = $data['ideas'] ?? $data['items'] ?? $data['keywords'] ?? ( $this->is_list_array( $data ) ? $data : [] );
+
+        foreach ( (array) $raw_ideas as $item ) {
+            if ( is_string( $item ) ) {
+                $item = [ 'keyword' => $item ];
+            }
+
+            $keyword = sanitize_text_field( $item['keyword'] ?? '' );
+            if ( $keyword === '' ) {
+                continue;
+            }
+
+            $competition = strtoupper( sanitize_text_field( $item['competition'] ?? 'MEDIUM' ) );
+            if ( ! in_array( $competition, [ 'LOW', 'MEDIUM', 'HIGH' ], true ) ) {
+                $competition = 'MEDIUM';
+            }
+
+            $ideas[] = [
+                'keyword'           => $keyword,
+                'category'          => sanitize_text_field( $item['category'] ?? 'genel' ),
+                'monthly_volume'    => max( 0, (int) ( $item['monthly_volume'] ?? 0 ) ),
+                'competition'       => $competition,
+                'opportunity_score' => max( 1, min( 100, (int) ( $item['opportunity_score'] ?? 70 ) ) ),
+                'reason'            => sanitize_textarea_field( $item['reason'] ?? '' ),
+            ];
+        }
+
+        $ideas = array_slice( $ideas, 0, 80 );
+        if ( empty( $ideas ) ) {
+            $ideas = $this->fallback_global_ideas();
+        }
+
+        $this->increment_daily_usage();
+        set_transient( $cache_key, $ideas, 14 * DAY_IN_SECONDS );
+
+        return $ideas;
+    }
+
     private function decode_json_text( string $text ){
         $data = json_decode( $text, true );
         if ( is_array( $data ) ) {
@@ -410,6 +510,55 @@ class OpenAIClient {
                 'competition'       => $index < 3 ? 'HIGH' : ( $index < 7 ? 'MEDIUM' : 'LOW' ),
                 'opportunity_score' => max( 65, 94 - $index ),
                 'reason'            => 'Konu odaklı hesaplama aracı fırsatı.',
+            ];
+        }
+
+        return $ideas;
+    }
+
+    private function fallback_global_ideas(){
+        $keywords = [
+            [ 'kredi hesaplama', 'finans' ],
+            [ 'ihtiyaç kredisi hesaplama', 'finans' ],
+            [ 'konut kredisi hesaplama', 'finans' ],
+            [ 'araç kredisi hesaplama', 'finans' ],
+            [ 'mevduat faizi hesaplama', 'finans' ],
+            [ 'bileşik faiz hesaplama', 'finans' ],
+            [ 'maaş hesaplama', 'maaş' ],
+            [ 'net brüt maaş hesaplama', 'maaş' ],
+            [ 'kıdem tazminatı hesaplama', 'maaş' ],
+            [ 'ihbar tazminatı hesaplama', 'maaş' ],
+            [ 'fazla mesai hesaplama', 'maaş' ],
+            [ 'gelir vergisi hesaplama', 'vergi' ],
+            [ 'kdv hesaplama', 'vergi' ],
+            [ 'mtv hesaplama', 'vergi' ],
+            [ 'emlak vergisi hesaplama', 'vergi' ],
+            [ 'emeklilik yaşı hesaplama', 'sgk' ],
+            [ 'prim günü hesaplama', 'sgk' ],
+            [ 'ideal kilo hesaplama', 'sağlık' ],
+            [ 'vücut kitle indeksi hesaplama', 'sağlık' ],
+            [ 'kalori ihtiyacı hesaplama', 'sağlık' ],
+            [ 'gebelik haftası hesaplama', 'sağlık' ],
+            [ 'yumurtlama günü hesaplama', 'sağlık' ],
+            [ 'iki tarih arası gün hesaplama', 'zaman' ],
+            [ 'yaş hesaplama', 'zaman' ],
+            [ 'iş günü hesaplama', 'zaman' ],
+            [ 'not ortalaması hesaplama', 'eğitim' ],
+            [ 'yks puan hesaplama', 'eğitim' ],
+            [ 'lgs puan hesaplama', 'eğitim' ],
+            [ 'yakıt tüketimi hesaplama', 'araç' ],
+            [ 'metrekare hesaplama', 'inşaat' ],
+        ];
+
+        $ideas = [];
+        foreach ( $keywords as $index => $row ) {
+            $ideas[] = [
+                'keyword'           => $row[0],
+                'category'          => $row[1],
+                'monthly_volume'    => max( 500, 8000 - ( $index * 180 ) ),
+                'competition'       => $index < 10 ? 'HIGH' : ( $index < 22 ? 'MEDIUM' : 'LOW' ),
+                'opportunity_score' => max( 65, 95 - $index ),
+                'reason'            => 'Genel hesaplama aracı fırsatı.',
             ];
         }
 

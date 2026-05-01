@@ -49,6 +49,7 @@ final class Plugin {
         add_action( 'wp_ajax_hge_clear_cache',          [ $this, 'ajax_clear_cache' ] );
         add_action( 'wp_ajax_hge_ai_keyword_insight',   [ $this, 'ajax_ai_keyword_insight' ] );
         add_action( 'wp_ajax_hge_ai_topic_ideas',       [ $this, 'ajax_ai_topic_ideas' ] );
+        add_action( 'wp_ajax_hge_ai_global_ideas',      [ $this, 'ajax_ai_global_ideas' ] );
         add_action( 'wp_ajax_hge_test_google_ads',      [ $this, 'ajax_test_google_ads' ] );
         add_action( 'wp_ajax_hge_inspect_index_status', [ $this, 'ajax_inspect_index_status' ] );
         add_action( 'wp_ajax_hge_inspect_index_batch',  [ $this, 'ajax_inspect_index_batch' ] );
@@ -228,6 +229,22 @@ final class Plugin {
 
         wp_send_json_success( [
             'message' => __( 'AI konu fikirleri eklendi.', 'hge' ),
+            'count'   => count( $result ),
+        ] );
+    }
+
+    public function ajax_ai_global_ideas(){
+        $this->verify_ajax_request();
+
+        $ideas  = new \HGE\Admin\NewIdeas();
+        $result = $ideas->generate_global_ideas();
+
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( [ 'message' => $result->get_error_message() ], 500 );
+        }
+
+        wp_send_json_success( [
+            'message' => __( 'AI genel hesaplama fikirleri eklendi.', 'hge' ),
             'count'   => count( $result ),
         ] );
     }
