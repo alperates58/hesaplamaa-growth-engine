@@ -75,9 +75,8 @@
     </div>
 
     <!-- AYARLAR FORMU -->
-    <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="hge-settings-form">
+    <form method="post" action="<?php echo esc_url( admin_url( 'options.php' ) ); ?>" class="hge-settings-form">
         <?php settings_fields( 'hge_settings_group' ); ?>
-        <input type="hidden" name="action" value="hge_save_settings">
 
         <div class="hge-settings-grid">
 

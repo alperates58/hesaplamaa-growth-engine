@@ -233,7 +233,12 @@
                     $result.addClass( 'error' ).text( res.data.message || HGE.i18n.error );
                 }
             } )
-            .fail( () => $result.addClass( 'error' ).text( HGE.i18n.error ) );
+            .fail( xhr => {
+                const msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                    ? xhr.responseJSON.data.message
+                    : HGE.i18n.error;
+                $result.addClass( 'error' ).text( msg );
+            } );
     } );
 
     $( '#hge-test-google-ads' ).on( 'click', function () {

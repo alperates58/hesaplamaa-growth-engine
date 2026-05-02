@@ -6,6 +6,7 @@ defined( 'ABSPATH' ) || exit;
 class GitHubUpdater {
 
     const OPTION_KEY = 'hge_github_settings';
+    const DEFAULT_REPO = 'alperates58/hesaplamaa-growth-engine';
 
     public function register(){
         add_action( 'admin_post_hge_save_github_settings', [ $this, 'handle_save_settings' ] );
@@ -17,7 +18,7 @@ class GitHubUpdater {
         return wp_parse_args(
             get_option( self::OPTION_KEY, [] ),
             [
-                'repo'   => 'alperates58/hesaplamaa-growth-engine',
+                'repo'   => self::DEFAULT_REPO,
                 'branch' => 'main',
                 'token'  => '',
             ]
@@ -25,31 +26,59 @@ class GitHubUpdater {
     }
 
     public function save_settings( array $data ){
+        $existing = $this->get_settings();
+        $repo     = sanitize_text_field( wp_unslash( $data['repo'] ?? '' ) );
+        $branch   = sanitize_text_field( wp_unslash( $data['branch'] ?? 'main' ) );
+        $token    = sanitize_text_field( wp_unslash( $data['token'] ?? '' ) );
+
+        if ( '' === $token && ! empty( $existing['token'] ) ) {
+            $token = $existing['token'];
+        }
+
         update_option(
             self::OPTION_KEY,
             [
-                'repo'   => sanitize_text_field( wp_unslash( $data['repo'] ?? '' ) ),
-                'branch' => sanitize_text_field( wp_unslash( $data['branch'] ?? 'main' ) ),
-                'token'  => sanitize_text_field( wp_unslash( $data['token'] ?? '' ) ),
+                'repo'   => $repo,
+                'branch' => $branch,
+                'token'  => $token,
             ]
         );
     }
 
     public function handle_save_settings(){
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_die( esc_html__( 'Yetkiniz yok.', 'hge' ) );
+            wp_die(
+                esc_html__( 'GitHub ayarlarini kaydetmek icin yetkiniz yok.', 'hge' ),
+                esc_html__( 'Yetki hatasi', 'hge' ),
+                [ 'response' => 403 ]
+            );
         }
 
         check_admin_referer( 'hge_save_github_settings' );
+
+        $repo   = sanitize_text_field( wp_unslash( $_POST['repo'] ?? '' ) );
+        $branch = sanitize_text_field( wp_unslash( $_POST['branch'] ?? '' ) );
+
+        if ( '' === $repo || '' === $branch || ! preg_match( '/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/', $repo ) ) {
+            wp_safe_redirect(
+                add_query_arg(
+                    [
+                        'github_error' => rawurlencode( __( 'Repository owner/repo formatinda olmali ve branch bos birakilmamalidir.', 'hge' ) ),
+                    ],
+                    $this->get_redirect_url()
+                )
+            );
+            exit;
+        }
+
         $this->save_settings( $_POST );
 
         wp_safe_redirect(
             add_query_arg(
                 [
-                    'page'  => 'hge-github-settings',
                     'saved' => '1',
                 ],
-                admin_url( 'admin.php' )
+                $this->get_redirect_url()
             )
         );
         exit;
@@ -58,24 +87,40 @@ class GitHubUpdater {
     public function get_remote_version(){
         $settings = $this->get_settings();
         if ( empty( $settings['repo'] ) || empty( $settings['branch'] ) ) {
-            return null;
+            return new \WP_Error( 'hge_github_missing_settings', __( 'Repo veya branch ayari eksik.', 'hge' ) );
         }
 
         $url      = sprintf( 'https://api.github.com/repos/%s/commits/%s', rawurlencode( $settings['repo'] ), rawurlencode( $settings['branch'] ) );
         $url      = str_replace( '%2F', '/', $url );
         $response = wp_remote_get( $url, $this->get_request_args( 20 ) );
 
-        if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
-            return null;
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+
+        $code = wp_remote_retrieve_response_code( $response );
+        if ( 200 !== $code ) {
+            return new \WP_Error(
+                'hge_github_api_failed',
+                sprintf(
+                    /* translators: %d: HTTP status code. */
+                    __( 'GitHub API istegi basarisiz oldu (HTTP %d). Repo, branch veya token bilgisini kontrol edin.', 'hge' ),
+                    $code
+                )
+            );
         }
 
         $body = json_decode( wp_remote_retrieve_body( $response ), true );
-        return is_array( $body ) ? ( $body['sha'] ?? null ) : null;
+        if ( ! is_array( $body ) || empty( $body['sha'] ) ) {
+            return new \WP_Error( 'hge_github_invalid_response', __( 'GitHub API beklenmeyen bir yanit dondurdu.', 'hge' ) );
+        }
+
+        return $body['sha'];
     }
 
     public function ajax_check_version(){
         if ( ! check_ajax_referer( 'hge_nonce', 'nonce', false ) ) {
-            wp_send_json_error( [ 'message' => __( 'Guvenlik dogrulamasi basarisiz.', 'hge' ) ], 403 );
+            wp_send_json_error( [ 'message' => __( 'Guvenlik dogrulamasi basarisiz. Sayfayi yenileyip tekrar deneyin.', 'hge' ) ], 400 );
         }
 
         if ( ! current_user_can( 'manage_options' ) ) {
@@ -83,8 +128,12 @@ class GitHubUpdater {
         }
 
         $sha = $this->get_remote_version();
+        if ( is_wp_error( $sha ) ) {
+            wp_send_json_error( [ 'message' => $sha->get_error_message() ], 200 );
+        }
+
         if ( ! $sha ) {
-            wp_send_json_error( [ 'message' => __( 'GitHub surumu okunamadi. Repo, branch veya token bilgisini kontrol edin.', 'hge' ) ] );
+            wp_send_json_error( [ 'message' => __( 'GitHub surumu okunamadi. Repo, branch veya token bilgisini kontrol edin.', 'hge' ) ], 200 );
         }
 
         wp_send_json_success(
@@ -97,13 +146,17 @@ class GitHubUpdater {
 
     public function handle_update(){
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_die( esc_html__( 'Yetkiniz yok.', 'hge' ) );
+            wp_die(
+                esc_html__( 'GitHub guncellemesi yapmak icin yetkiniz yok.', 'hge' ),
+                esc_html__( 'Yetki hatasi', 'hge' ),
+                [ 'response' => 403 ]
+            );
         }
 
         check_admin_referer( 'hge_update_from_github' );
 
         $result = $this->download_and_install();
-        $args   = [ 'page' => 'hge-github-settings' ];
+        $args   = [];
 
         if ( true === $result ) {
             $args['update'] = 'success';
@@ -111,7 +164,7 @@ class GitHubUpdater {
             $args['update_error'] = rawurlencode( (string) $result );
         }
 
-        wp_safe_redirect( add_query_arg( $args, admin_url( 'admin.php' ) ) );
+        wp_safe_redirect( add_query_arg( $args, $this->get_redirect_url() ) );
         exit;
     }
 
@@ -150,19 +203,19 @@ class GitHubUpdater {
             return __( 'Indirilen paket acildi ama beklenen klasor bulunamadi.', 'hge' );
         }
 
-        if ( ! $wp_filesystem->delete( $destination, true ) ) {
-            return __( 'Mevcut eklenti klasoru silinemedi.', 'hge' );
+        $copy = copy_dir( $extracted_dir, $destination );
+        if ( is_wp_error( $copy ) ) {
+            $wp_filesystem->delete( $extracted_dir, true );
+            return $copy->get_error_message();
         }
 
-        if ( ! @rename( $extracted_dir, $destination ) ) {
-            return __( 'Yeni eklenti klasoru yerine tasinamadi.', 'hge' );
-        }
+        $wp_filesystem->delete( $extracted_dir, true );
 
         $remote_sha = $this->get_remote_version();
 
         update_option( 'hge_last_update', current_time( 'mysql' ) );
         update_option( 'hge_last_update_version', (string) time() );
-        if ( $remote_sha ) {
+        if ( ! is_wp_error( $remote_sha ) && $remote_sha ) {
             update_option( 'hge_last_update_sha', $remote_sha );
         }
 
@@ -214,8 +267,16 @@ class GitHubUpdater {
         }
 
         if ( 200 !== wp_remote_retrieve_response_code( $response ) ) {
+            $code = wp_remote_retrieve_response_code( $response );
             @unlink( $tmp_file );
-            return new \WP_Error( 'hge_download_failed', __( 'GitHub ZIP indirilemedi.', 'hge' ) );
+            return new \WP_Error(
+                'hge_download_failed',
+                sprintf(
+                    /* translators: %d: HTTP status code. */
+                    __( 'GitHub ZIP indirilemedi (HTTP %d). Repo, branch veya token bilgisini kontrol edin.', 'hge' ),
+                    $code
+                )
+            );
         }
 
         return $tmp_file;
@@ -236,5 +297,15 @@ class GitHubUpdater {
             'timeout' => $timeout,
             'headers' => $headers,
         ];
+    }
+
+    private function get_redirect_url(){
+        $referer = wp_get_referer();
+
+        if ( $referer ) {
+            return remove_query_arg( [ 'saved', 'update', 'update_error', 'github_error' ], $referer );
+        }
+
+        return admin_url( 'admin.php?page=hge-github-settings' );
     }
 }

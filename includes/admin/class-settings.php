@@ -60,10 +60,18 @@ class Settings {
 
     public function handle_save_settings(){
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_die( esc_html__( 'Yetkiniz yok.', 'hge' ) );
+            wp_die(
+                esc_html__( 'Bu ayarlari kaydetmek icin yetkiniz yok.', 'hge' ),
+                esc_html__( 'Yetki hatasi', 'hge' ),
+                [ 'response' => 403 ]
+            );
         }
 
-        check_admin_referer( 'hge_settings_group-options' );
+        if ( isset( $_POST['hge_settings_nonce'] ) ) {
+            check_admin_referer( 'hge_save_settings', 'hge_settings_nonce' );
+        } else {
+            check_admin_referer( 'hge_settings_group-options' );
+        }
 
         $input = isset( $_POST[ self::OPTION_KEY ] ) && is_array( $_POST[ self::OPTION_KEY ] )
             ? wp_unslash( $_POST[ self::OPTION_KEY ] )
@@ -85,10 +93,14 @@ class Settings {
 
     public function render(){
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_die( esc_html__( 'Yetkiniz yok.', 'hge' ) );
+            wp_die(
+                esc_html__( 'Bu sayfayi goruntulemek icin yetkiniz yok.', 'hge' ),
+                esc_html__( 'Yetki hatasi', 'hge' ),
+                [ 'response' => 403 ]
+            );
         }
 
-        settings_errors( 'hge' );
+        settings_errors();
 
         $settings      = get_option( self::OPTION_KEY, [] );
         $gsc_client    = new \HGE\API\GSCClient();

@@ -23,6 +23,10 @@
         <div class="notice notice-error is-dismissible"><p><?php echo esc_html( rawurldecode( $error ) ); ?></p></div>
     <?php endif; ?>
 
+    <?php if ( $settings_error ) : ?>
+        <div class="notice notice-error is-dismissible"><p><?php echo esc_html( rawurldecode( $settings_error ) ); ?></p></div>
+    <?php endif; ?>
+
     <div class="hge-settings-grid">
         <div class="hge-card">
             <div class="hge-card-header"><h3><?php esc_html_e( 'GitHub Baglantisi', 'hge' ); ?></h3></div>
@@ -62,8 +66,8 @@
                             type="password"
                             id="hge_github_token"
                             name="token"
-                            value="<?php echo esc_attr( $settings['token'] ); ?>"
-                            placeholder="ghp_xxxx"
+                            value=""
+                            placeholder="<?php echo ! empty( $settings['token'] ) ? esc_attr__( 'Token kayitli; degistirmek icin yeni token girin', 'hge' ) : 'ghp_xxxx'; ?>"
                             class="hge-input"
                             autocomplete="new-password"
                         />

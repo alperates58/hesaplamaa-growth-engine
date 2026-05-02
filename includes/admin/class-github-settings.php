@@ -15,6 +15,7 @@ class GitHubSettings {
         $saved    = isset( $_GET['saved'] );
         $update   = sanitize_text_field( wp_unslash( $_GET['update'] ?? '' ) );
         $error    = sanitize_text_field( wp_unslash( $_GET['update_error'] ?? '' ) );
+        $settings_error = sanitize_text_field( wp_unslash( $_GET['github_error'] ?? '' ) );
         $last     = get_option( 'hge_last_update', '-' );
         $sha      = substr( (string) get_option( 'hge_last_update_sha', '' ), 0, 7 );
 

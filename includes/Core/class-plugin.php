@@ -396,7 +396,7 @@ final class Plugin {
 
     private function verify_ajax_request(){
         if ( ! check_ajax_referer( 'hge_nonce', 'nonce', false ) ) {
-            wp_send_json_error( [ 'message' => __( 'Güvenlik doğrulaması başarısız.', 'hge' ) ], 403 );
+            wp_send_json_error( [ 'message' => __( 'Güvenlik doğrulaması başarısız. Sayfayı yenileyip tekrar deneyin.', 'hge' ) ], 400 );
         }
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( 'Yetkiniz yok.', 'hge' ) ], 403 );
