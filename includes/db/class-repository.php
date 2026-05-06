@@ -432,7 +432,7 @@ class Repository {
         $placeholders = implode( ',', array_fill( 0, count( $hashes ), '%s' ) );
         $rows         = $this->wpdb->get_results(
             $this->wpdb->prepare(
-                "SELECT keyword, keyword_hash FROM {$this->keyword_volumes} WHERE keyword_hash IN ($placeholders)",
+                "SELECT keyword, keyword_hash FROM {$this->keyword_volumes} WHERE keyword_hash IN ($placeholders) AND status = 'ready'",
                 $hashes
             ),
             ARRAY_A

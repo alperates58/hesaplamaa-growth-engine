@@ -117,6 +117,14 @@ class GoogleAdsClient {
         }
 
         $metrics = [];
+        foreach ( $keywords as $kw ) {
+            $metrics[ $kw ] = [
+                'monthly_volume' => 0,
+                'competition'    => 'UNKNOWN',
+                'source'         => 'google_ads',
+            ];
+        }
+
         foreach ( (array) ( $data['results'] ?? [] ) as $row ) {
             $keyword = sanitize_text_field( $row['text'] ?? '' );
             $metric  = $row['keywordMetrics'] ?? [];

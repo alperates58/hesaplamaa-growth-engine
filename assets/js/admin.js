@@ -341,8 +341,39 @@
         formData.append( 'nonce', HGE.nonce );
         formData.append( 'keyword_file', file );
 
-        $button.prop( 'disabled', true ).text( 'Isleniyor...' );
-        $result.prop( 'hidden', false ).removeClass( 'is-error' ).html( '<strong>Dosya yuklendi.</strong><span>Keywordler API ile isleniyor...</span>' );
+        $button.prop( 'disabled', true ).text( 'Isleme Basliyor...' );
+        $result.prop( 'hidden', false ).removeClass( 'is-error' ).html( '<strong>Dosya yukleniyor.</strong><span>Lutfen bekleyin, sayfa yenilenene kadar sekmeyi kapatmayin...</span>' );
+
+        function processPending() {
+            $.ajax({
+                url: HGE.ajax_url,
+                method: 'POST',
+                data: { action: 'hge_process_pending_keywords', nonce: HGE.nonce }
+            }).done(res => {
+                if (res.success) {
+                    if (res.data.has_more) {
+                        $result.html( `<strong>Islem Devam Ediyor...</strong><span>${res.data.message} Lutfen bekleyin...</span>` );
+                        processPending();
+                    } else {
+                        renderVolumeResult( res.data || {} );
+                        toast( 'Tum islemler tamamlandi.', 'success' );
+                        setTimeout( () => location.reload(), 1500 );
+                    }
+                } else {
+                    const msg = res.data && res.data.message ? res.data.message : HGE.i18n.error;
+                    $result.addClass( 'is-error' ).html( `<strong>Islem basarisiz (Arka Plan).</strong><span>${ msg }</span>` );
+                    toast( msg, 'error' );
+                    $button.prop( 'disabled', false ).text( 'Listeyi Isle' );
+                }
+            }).fail(xhr => {
+                const msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                    ? xhr.responseJSON.data.message
+                    : HGE.i18n.error;
+                $result.addClass( 'is-error' ).html( `<strong>Hata olustu.</strong><span>${ msg }</span>` );
+                toast( msg, 'error' );
+                $button.prop( 'disabled', false ).text( 'Listeyi Isle' );
+            });
+        }
 
         $.ajax( {
             url: HGE.ajax_url,
@@ -354,12 +385,18 @@
             .done( res => {
                 if ( res.success ) {
                     renderVolumeResult( res.data || {} );
-                    toast( res.data && res.data.message ? res.data.message : 'Keyword listesi islendi.', 'success' );
-                    setTimeout( () => location.reload(), 1200 );
+                    if (res.data.has_more) {
+                        $button.text( 'Arka Planda Isleniyor...' );
+                        processPending();
+                    } else {
+                        toast( res.data && res.data.message ? res.data.message : 'Keyword listesi islendi.', 'success' );
+                        setTimeout( () => location.reload(), 1200 );
+                    }
                 } else {
                     const msg = res.data && res.data.message ? res.data.message : HGE.i18n.error;
                     $result.addClass( 'is-error' ).html( `<strong>Islem basarisiz.</strong><span>${ msg }</span>` );
                     toast( msg, 'error' );
+                    $button.prop( 'disabled', false ).text( 'Listeyi Isle' );
                 }
             } )
             .fail( xhr => {
@@ -368,8 +405,6 @@
                     : HGE.i18n.error;
                 $result.addClass( 'is-error' ).html( `<strong>Islem basarisiz.</strong><span>${ msg }</span>` );
                 toast( msg, 'error' );
-            } )
-            .always( () => {
                 $button.prop( 'disabled', false ).text( 'Listeyi Isle' );
             } );
     } );

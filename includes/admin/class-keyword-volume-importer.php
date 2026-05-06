@@ -80,46 +80,89 @@ class KeywordVolumeImporter {
 
         $upload_batch = wp_generate_uuid4();
         $source_file  = sanitize_file_name( (string) ( $file['name'] ?? 'keywords.txt' ) );
-        $inserted     = [];
+        $inserted_count = 0;
 
-        foreach ( array_chunk( $keywords_to_add, 100 ) as $chunk ) {
-            $metrics = $client->get_keyword_metrics( $chunk );
-
-            foreach ( $chunk as $keyword ) {
-                $metric = $metrics[ $keyword ] ?? null;
-                $saved  = $this->repo->save_keyword_volume( [
-                    'keyword'        => $keyword,
-                    'monthly_volume' => is_array( $metric ) ? (int) ( $metric['monthly_volume'] ?? 0 ) : 0,
-                    'competition'    => is_array( $metric ) ? (string) ( $metric['competition'] ?? 'UNKNOWN' ) : 'UNKNOWN',
-                    'status'         => is_array( $metric ) ? 'ready' : 'no_metrics',
-                    'source_file'    => $source_file,
-                    'upload_batch'   => $upload_batch,
-                    'api_source'     => is_array( $metric ) ? (string) ( $metric['source'] ?? 'google_ads' ) : 'google_ads',
-                ] );
-
-                if ( $saved ) {
-                    $inserted[] = [
-                        'keyword'        => $keyword,
-                        'monthly_volume' => is_array( $metric ) ? (int) ( $metric['monthly_volume'] ?? 0 ) : 0,
-                        'competition'    => is_array( $metric ) ? (string) ( $metric['competition'] ?? 'UNKNOWN' ) : 'UNKNOWN',
-                        'status'         => is_array( $metric ) ? 'ready' : 'no_metrics',
-                        'source_file'    => $source_file,
-                    ];
-                }
+        foreach ( $keywords_to_add as $keyword ) {
+            $saved = $this->repo->save_keyword_volume( [
+                'keyword'        => $keyword,
+                'monthly_volume' => 0,
+                'competition'    => 'UNKNOWN',
+                'status'         => 'no_metrics',
+                'source_file'    => $source_file,
+                'upload_batch'   => $upload_batch,
+                'api_source'     => 'google_ads',
+            ] );
+            if ( $saved ) {
+                $inserted_count++;
             }
         }
 
         return [
             'message'        => sprintf(
-                __( '%1$d yeni keyword işlendi, %2$d tekrar keyword atlandı.', 'hge' ),
-                count( $inserted ),
+                __( '%1$d yeni keyword eklendi, %2$d tekrar atlandı. Arka planda hacim sorgusu başlıyor...', 'hge' ),
+                $inserted_count,
                 count( $skipped_existing )
             ),
-            'inserted_count' => count( $inserted ),
+            'inserted_count' => $inserted_count,
             'skipped_count'  => count( $skipped_existing ),
             'total_in_file'  => count( $parsed_keywords ),
-            'items'          => array_slice( $inserted, 0, 100 ),
+            'has_more'       => true,
             'summary'        => $this->repo->get_keyword_volume_summary(),
+        ];
+    }
+
+    public function process_pending_keywords() {
+        $client = new \HGE\API\GoogleAdsClient();
+        if ( ! $client->is_configured() ) {
+            return new \WP_Error( 'hge_ads_not_configured', __( 'Google Ads API ayarları eksik.', 'hge' ) );
+        }
+
+        $pending = $this->repo->get_keyword_volumes( [ 'limit' => 200 ] ); // Need to fetch only no_metrics
+        // Wait, get_keyword_volumes doesn't support 'status' filter out of the box in Repository.
+        // Let's use WPDB directly here for simplicity, or modify Repository.
+        // Actually, let's just add 'status' to get_keyword_volumes in Repository next.
+        
+        // I will use direct repo query since it's cleaner:
+        global $wpdb;
+        $table = $this->repo->keyword_volumes;
+        $rows = $wpdb->get_results( "SELECT * FROM {$table} WHERE status = 'no_metrics' ORDER BY id ASC LIMIT 200", ARRAY_A ) ?: [];
+
+        if ( empty( $rows ) ) {
+            return [
+                'message'  => __( 'Bekleyen keyword bulunamadı.', 'hge' ),
+                'has_more' => false,
+                'summary'  => $this->repo->get_keyword_volume_summary(),
+            ];
+        }
+
+        $keywords = array_column( $rows, 'keyword' );
+        $source_files = array_column( $rows, 'source_file', 'keyword' );
+        $upload_batches = array_column( $rows, 'upload_batch', 'keyword' );
+
+        foreach ( array_chunk( $keywords, 100 ) as $chunk ) {
+            $metrics = $client->get_keyword_metrics( $chunk );
+
+            foreach ( $chunk as $keyword ) {
+                $metric = $metrics[ $keyword ] ?? null;
+                $this->repo->save_keyword_volume( [
+                    'keyword'        => $keyword,
+                    'monthly_volume' => is_array( $metric ) ? (int) ( $metric['monthly_volume'] ?? 0 ) : 0,
+                    'competition'    => is_array( $metric ) ? (string) ( $metric['competition'] ?? 'UNKNOWN' ) : 'UNKNOWN',
+                    'status'         => is_array( $metric ) ? 'ready' : 'no_metrics',
+                    'source_file'    => $source_files[$keyword] ?? '',
+                    'upload_batch'   => $upload_batches[$keyword] ?? '',
+                    'api_source'     => is_array( $metric ) ? (string) ( $metric['source'] ?? 'google_ads' ) : 'google_ads',
+                ] );
+            }
+            sleep(1);
+        }
+
+        $remaining = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE status = 'no_metrics'" );
+
+        return [
+            'message'   => sprintf( __( '%d keyword işlendi. Kalan: %d', 'hge' ), count($keywords), $remaining ),
+            'has_more'  => $remaining > 0,
+            'summary'   => $this->repo->get_keyword_volume_summary(),
         ];
     }
 
