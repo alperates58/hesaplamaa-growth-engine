@@ -451,6 +451,7 @@ class Repository {
 
     public function upsert_index_status( array $row ){
         $url      = esc_url_raw( $row['page_url'] ?? '' );
+        $post_id  = (int) ( $row['post_id'] ?? 0 );
         $url_hash = md5( $url );
         $existing = $this->wpdb->get_var(
             $this->wpdb->prepare(
@@ -459,11 +460,20 @@ class Repository {
             )
         );
 
+        if ( ! $existing && $post_id > 0 ) {
+            $existing = $this->wpdb->get_var(
+                $this->wpdb->prepare(
+                    "SELECT id FROM {$this->index_status} WHERE post_id = %d",
+                    $post_id
+                )
+            );
+        }
+
         $data = [
             'url_hash'         => $url_hash,
             'page_url'         => $url,
             'page_title'       => sanitize_text_field( $row['page_title'] ?? '' ),
-            'post_id'          => (int) ( $row['post_id'] ?? 0 ),
+            'post_id'          => $post_id,
             'verdict'          => sanitize_text_field( $row['verdict'] ?? '' ),
             'coverage_state'   => sanitize_text_field( $row['coverage_state'] ?? '' ),
             'robots_txt_state' => sanitize_text_field( $row['robots_txt_state'] ?? '' ),
@@ -500,10 +510,21 @@ class Repository {
             )
         );
 
+        if ( ! $existing && $post_id > 0 ) {
+            $existing = $this->wpdb->get_var(
+                $this->wpdb->prepare(
+                    "SELECT id FROM {$this->index_status} WHERE post_id = %d",
+                    $post_id
+                )
+            );
+        }
+
         if ( $existing ) {
             return (bool) $this->wpdb->update(
                 $this->index_status,
                 [
+                    'url_hash'         => $url_hash,
+                    'page_url'         => $url,
                     'page_title'       => sanitize_text_field( $title ),
                     'post_id'          => (int) $post_id,
                     'verdict'          => '',

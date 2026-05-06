@@ -20,7 +20,7 @@ class IndexStatus {
 
         foreach ( $this->get_public_posts() as $post ) {
             $url    = get_permalink( $post->ID );
-            $status = $status_map[ 'post:' . $post->ID ] ?? $status_map[ $url ] ?? [];
+            $status = $this->normalize_status_for_post( $status_map[ 'post:' . $post->ID ] ?? $status_map[ $url ] ?? [], $url );
 
             $rows[] = array_merge(
                 [
@@ -37,7 +37,12 @@ class IndexStatus {
                     'inspection_link'  => '',
                     'error_message'    => '',
                 ],
-                $status
+                $status,
+                [
+                    'post_id'    => $post->ID,
+                    'page_url'   => $url,
+                    'page_title' => get_the_title( $post->ID ) ?: '(BaÅŸlÄ±ksÄ±z)',
+                ]
             );
         }
 
@@ -133,7 +138,8 @@ class IndexStatus {
             'error_message'    => '',
         ] );
 
-        return $this->format_row_for_response( $this->repo->get_index_status_map()[ $url ] ?? [] );
+        $status_map = $this->repo->get_index_status_map();
+        return $this->format_row_for_response( $status_map[ 'post:' . $post_id ] ?? $status_map[ $url ] ?? [] );
     }
 
     public function inspect_pending( int $limit = 5 ){
@@ -264,6 +270,31 @@ class IndexStatus {
 
         $settings['gsc_site_url'] = $site_url;
         update_option( 'hge_settings', $settings );
+    }
+
+    private function normalize_status_for_post( array $status, string $current_url ){
+        if ( empty( $status ) || empty( $status['page_url'] ) || $status['page_url'] === $current_url ) {
+            return $status;
+        }
+
+        foreach ( [
+            'verdict',
+            'coverage_state',
+            'robots_txt_state',
+            'indexing_state',
+            'page_fetch_state',
+            'google_canonical',
+            'user_canonical',
+            'crawled_as',
+            'last_crawl_time',
+            'last_checked',
+            'inspection_link',
+            'error_message',
+        ] as $field ) {
+            $status[ $field ] = '';
+        }
+
+        return $status;
     }
 
     private function format_row_for_response( array $row ){
