@@ -218,6 +218,38 @@
             .fail( () => toast( HGE.i18n.error, 'error' ) );
     } );
 
+    $( '#hge-refresh-archive-volumes' ).on( 'click', function () {
+        const $result = $( '#hge-archive-volume-result' );
+        const payload = {
+            search: $( 'input[name="hge_search"]' ).val() || '',
+            source: $( 'select[name="hge_source"]' ).val() || '',
+            competition: $( 'select[name="hge_competition"]' ).val() || '',
+            status: $( 'select[name="hge_status"]' ).val() || '',
+            limit: $( 'select[name="hge_limit"]' ).val() || 300,
+        };
+
+        $result.removeClass( 'success error' ).text( 'Google Ads aranma hacimleri güncelleniyor...' );
+
+        ajaxRequest( 'hge_refresh_archive_volumes', payload, this )
+            .done( res => {
+                if ( res.success ) {
+                    $result.addClass( 'success' ).text( res.data.message || 'Aranma hacimleri güncellendi.' );
+                    toast( res.data.message || 'Aranma hacimleri güncellendi.', 'success' );
+                    setTimeout( () => location.reload(), 1200 );
+                } else {
+                    $result.addClass( 'error' ).text( res.data.message || HGE.i18n.error );
+                    toast( res.data.message || HGE.i18n.error, 'error' );
+                }
+            } )
+            .fail( xhr => {
+                const msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                    ? xhr.responseJSON.data.message
+                    : HGE.i18n.error;
+                $result.addClass( 'error' ).text( msg );
+                toast( msg, 'error' );
+            } );
+    } );
+
     // -------------------------------------------------------------------------
     // GitHub versiyon kontrolu
     // -------------------------------------------------------------------------

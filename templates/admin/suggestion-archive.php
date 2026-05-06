@@ -11,6 +11,9 @@
             </div>
         </div>
         <div class="hge-header-right">
+            <button class="hge-btn hge-btn-secondary" type="button" id="hge-refresh-archive-volumes">
+                <?php esc_html_e( 'Aranma Hacimlerini Güncelle', 'hge' ); ?>
+            </button>
             <a class="hge-btn hge-btn-primary" href="<?php echo esc_url( admin_url( 'admin.php?page=hge-new-ideas' ) ); ?>">
                 <?php esc_html_e( 'Yeni Fikirler', 'hge' ); ?>
             </a>
@@ -82,6 +85,8 @@
                 <button class="hge-btn hge-btn-primary" type="submit"><?php esc_html_e( 'Filtrele', 'hge' ); ?></button>
                 <a class="hge-btn hge-btn-secondary" href="<?php echo esc_url( admin_url( 'admin.php?page=hge-suggestion-archive' ) ); ?>"><?php esc_html_e( 'Sıfırla', 'hge' ); ?></a>
             </form>
+
+            <div id="hge-archive-volume-result" class="hge-inline-result"></div>
 
             <div class="hge-table-wrap">
                 <table class="hge-table hge-table-sortable hge-archive-table">

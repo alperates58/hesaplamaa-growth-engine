@@ -52,6 +52,7 @@ final class Plugin {
         add_action( 'wp_ajax_hge_ai_global_ideas',      [ $this, 'ajax_ai_global_ideas' ] );
         add_action( 'wp_ajax_hge_test_google_ads',      [ $this, 'ajax_test_google_ads' ] );
         add_action( 'wp_ajax_hge_import_keyword_volumes', [ $this, 'ajax_import_keyword_volumes' ] );
+        add_action( 'wp_ajax_hge_refresh_archive_volumes', [ $this, 'ajax_refresh_archive_volumes' ] );
         add_action( 'wp_ajax_hge_inspect_index_status', [ $this, 'ajax_inspect_index_status' ] );
         add_action( 'wp_ajax_hge_inspect_index_batch',  [ $this, 'ajax_inspect_index_batch' ] );
 
@@ -275,6 +276,28 @@ final class Plugin {
 
         $service = new \HGE\Admin\KeywordVolumeImporter();
         $result  = $service->handle_import_request();
+
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( [ 'message' => $result->get_error_message() ], 400 );
+        }
+
+        wp_send_json_success( $result );
+    }
+
+    public function ajax_refresh_archive_volumes(){
+        $this->verify_ajax_request();
+
+        $filters = [
+            'search'      => sanitize_text_field( wp_unslash( $_POST['search'] ?? '' ) ),
+            'source'      => sanitize_text_field( wp_unslash( $_POST['source'] ?? '' ) ),
+            'competition' => sanitize_text_field( wp_unslash( $_POST['competition'] ?? '' ) ),
+            'status'      => sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) ),
+            'created'     => sanitize_text_field( wp_unslash( $_POST['created'] ?? '' ) ),
+            'limit'       => (int) ( $_POST['limit'] ?? 300 ),
+        ];
+
+        $service = new \HGE\Admin\SuggestionArchive();
+        $result  = $service->refresh_volumes( $filters );
 
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( [ 'message' => $result->get_error_message() ], 400 );
