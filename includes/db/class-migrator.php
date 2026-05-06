@@ -10,7 +10,7 @@ defined( 'ABSPATH' ) || exit;
 class Migrator {
 
     const DB_VERSION_OPTION = 'hge_db_version';
-    const DB_VERSION        = '1.2.0';
+    const DB_VERSION        = '1.3.0';
 
     public static function maybe_run(){
         if ( get_option( self::DB_VERSION_OPTION ) !== self::DB_VERSION ) {
@@ -143,6 +143,26 @@ class Migrator {
             UNIQUE KEY setting_key (setting_key)
         ) $charset_collate;";
 
+        // ---- wp_hge_keyword_volumes -----------------------------------------
+        $sql[] = "CREATE TABLE {$wpdb->prefix}hge_keyword_volumes (
+            id             BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            keyword        VARCHAR(500)        NOT NULL,
+            keyword_hash   CHAR(32)            NOT NULL,
+            monthly_volume INT(11)             NOT NULL DEFAULT 0,
+            competition    VARCHAR(20)         NOT NULL DEFAULT 'UNKNOWN',
+            status         VARCHAR(20)         NOT NULL DEFAULT 'pending',
+            source_file    VARCHAR(255)        NOT NULL DEFAULT '',
+            upload_batch   VARCHAR(64)         NOT NULL DEFAULT '',
+            api_source     VARCHAR(50)         NOT NULL DEFAULT 'google_ads',
+            created_at     DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at     DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY keyword_hash_idx (keyword_hash),
+            KEY keyword_idx (keyword(100)),
+            KEY batch_idx (upload_batch),
+            KEY updated_idx (updated_at)
+        ) $charset_collate;";
+
         foreach ( $sql as $query ) {
             dbDelta( $query );
         }
@@ -163,6 +183,7 @@ class Migrator {
             $wpdb->prefix . 'hge_ai_insights',
             $wpdb->prefix . 'hge_index_status',
             $wpdb->prefix . 'hge_settings',
+            $wpdb->prefix . 'hge_keyword_volumes',
         ];
         foreach ( $tables as $table ) {
             $wpdb->query( "DROP TABLE IF EXISTS `{$table}`" ); // phpcs:ignore

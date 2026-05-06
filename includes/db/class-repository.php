@@ -17,6 +17,7 @@ class Repository {
     public string $suggestions;
     public string $ai_insights;
     public string $index_status;
+    public string $keyword_volumes;
 
     public function __construct() {
         global $wpdb;
@@ -27,6 +28,7 @@ class Repository {
         $this->suggestions = $wpdb->prefix . 'hge_suggestions';
         $this->ai_insights = $wpdb->prefix . 'hge_ai_insights';
         $this->index_status = $wpdb->prefix . 'hge_index_status';
+        $this->keyword_volumes = $wpdb->prefix . 'hge_keyword_volumes';
     }
 
     // -------------------------------------------------------------------------
@@ -416,6 +418,112 @@ class Repository {
         return $row;
     }
 
+    // -------------------------------------------------------------------------
+    // Keyword volume import
+    // -------------------------------------------------------------------------
+
+    public function get_existing_keyword_volume_map( array $keywords ){
+        $keywords = array_values( array_filter( array_unique( array_map( [ $this, 'normalize_keyword' ], $keywords ) ) ) );
+        if ( empty( $keywords ) ) {
+            return [];
+        }
+
+        $hashes       = array_map( 'md5', $keywords );
+        $placeholders = implode( ',', array_fill( 0, count( $hashes ), '%s' ) );
+        $rows         = $this->wpdb->get_results(
+            $this->wpdb->prepare(
+                "SELECT keyword, keyword_hash FROM {$this->keyword_volumes} WHERE keyword_hash IN ($placeholders)",
+                $hashes
+            ),
+            ARRAY_A
+        ) ?: [];
+
+        $map = [];
+        foreach ( $rows as $row ) {
+            $map[ (string) $row['keyword_hash'] ] = (string) $row['keyword'];
+        }
+
+        return $map;
+    }
+
+    public function save_keyword_volume( array $row ){
+        $keyword = $this->normalize_keyword( (string) ( $row['keyword'] ?? '' ) );
+        if ( $keyword === '' ) {
+            return false;
+        }
+
+        $hash = md5( $keyword );
+        $data = [
+            'keyword'        => $keyword,
+            'keyword_hash'   => $hash,
+            'monthly_volume' => max( 0, (int) ( $row['monthly_volume'] ?? 0 ) ),
+            'competition'    => sanitize_text_field( strtoupper( (string) ( $row['competition'] ?? 'UNKNOWN' ) ) ),
+            'status'         => sanitize_text_field( (string) ( $row['status'] ?? 'ready' ) ),
+            'source_file'    => sanitize_file_name( (string) ( $row['source_file'] ?? '' ) ),
+            'upload_batch'   => sanitize_text_field( (string) ( $row['upload_batch'] ?? '' ) ),
+            'api_source'     => sanitize_text_field( (string) ( $row['api_source'] ?? 'google_ads' ) ),
+            'updated_at'     => current_time( 'mysql' ),
+        ];
+
+        $existing_id = $this->wpdb->get_var(
+            $this->wpdb->prepare(
+                "SELECT id FROM {$this->keyword_volumes} WHERE keyword_hash = %s",
+                $hash
+            )
+        );
+
+        if ( $existing_id ) {
+            return (bool) $this->wpdb->update( $this->keyword_volumes, $data, [ 'id' => $existing_id ] );
+        }
+
+        $data['created_at'] = current_time( 'mysql' );
+        return (bool) $this->wpdb->insert( $this->keyword_volumes, $data );
+    }
+
+    public function get_keyword_volumes( array $filters = [] ){
+        $limit  = max( 20, min( 500, (int) ( $filters['limit'] ?? 200 ) ) );
+        $search = sanitize_text_field( (string) ( $filters['search'] ?? '' ) );
+
+        $where  = [ '1=1' ];
+        $params = [];
+
+        if ( $search !== '' ) {
+            $where[]  = 'keyword LIKE %s';
+            $params[] = '%' . $this->wpdb->esc_like( $search ) . '%';
+        }
+
+        $sql = "SELECT *
+                FROM {$this->keyword_volumes}
+                WHERE " . implode( ' AND ', $where ) . "
+                ORDER BY updated_at DESC, id DESC
+                LIMIT %d";
+        $params[] = $limit;
+
+        return $this->wpdb->get_results(
+            $this->wpdb->prepare( $sql, $params ),
+            ARRAY_A
+        ) ?: [];
+    }
+
+    public function get_keyword_volume_summary(){
+        $row = $this->wpdb->get_row(
+            "SELECT
+                COUNT(*) total,
+                SUM(monthly_volume) total_volume,
+                SUM(CASE WHEN status = 'no_metrics' THEN 1 ELSE 0 END) missing_metrics,
+                MAX(updated_at) latest_updated
+             FROM {$this->keyword_volumes}",
+            ARRAY_A
+        ) ?: [];
+
+        return [
+            'total'           => (int) ( $row['total'] ?? 0 ),
+            'total_volume'    => (int) ( $row['total_volume'] ?? 0 ),
+            'missing_metrics' => (int) ( $row['missing_metrics'] ?? 0 ),
+            'latest_updated'  => (string) ( $row['latest_updated'] ?? '' ),
+        ];
+    }
+
     public function save_ai_insight( string $keyword, string $model, array $insight, string $prompt_hash = '' ){
         $json = wp_json_encode( $insight, JSON_UNESCAPED_UNICODE );
         if ( ! $json ) {
@@ -572,6 +680,17 @@ class Repository {
 
         $timestamp = strtotime( $value );
         return $timestamp ? gmdate( 'Y-m-d H:i:s', $timestamp ) : null;
+    }
+
+    private function normalize_keyword( string $keyword ){
+        $keyword = sanitize_text_field( $keyword );
+        $keyword = preg_replace( '/\s+/u', ' ', trim( $keyword ) );
+
+        if ( function_exists( 'mb_strtolower' ) ) {
+            return mb_strtolower( $keyword, 'UTF-8' );
+        }
+
+        return strtolower( $keyword );
     }
 
     // -------------------------------------------------------------------------

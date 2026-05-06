@@ -7,7 +7,7 @@
             </div>
             <div>
                 <h1 class="hge-page-title"><?php esc_html_e( 'AI Entegrasyonu', 'hge' ); ?></h1>
-                <p class="hge-page-subtitle"><?php esc_html_e( 'Yeni fırsatlar için token kontrollü OpenAI analizleri', 'hge' ); ?></p>
+                <p class="hge-page-subtitle"><?php esc_html_e( 'OpenAI veya DeepSeek ile token kontrollü analizler', 'hge' ); ?></p>
             </div>
         </div>
     </div>
@@ -15,7 +15,7 @@
     <div class="hge-settings-grid">
         <div class="hge-card">
             <div class="hge-card-header">
-                <h3><?php esc_html_e( 'OpenAI Ayarları', 'hge' ); ?></h3>
+                <h3><?php esc_html_e( 'AI Sağlayıcı Ayarları', 'hge' ); ?></h3>
                 <?php if ( ! empty( $settings['enabled'] ) && ! empty( $settings['api_key'] ) ): ?>
                     <span class="hge-badge hge-badge-success"><?php esc_html_e( 'Aktif', 'hge' ); ?></span>
                 <?php else: ?>
@@ -32,7 +32,16 @@
                     </label>
 
                     <div class="hge-field">
-                        <label for="hge_ai_api_key"><?php esc_html_e( 'OpenAI API Key', 'hge' ); ?></label>
+                        <label for="hge_ai_provider"><?php esc_html_e( 'Sağlayıcı', 'hge' ); ?></label>
+                        <select id="hge_ai_provider" name="hge_ai_settings[provider]" class="hge-select">
+                            <option value="openai" <?php selected( $settings['provider'] ?? 'openai', 'openai' ); ?>>OpenAI</option>
+                            <option value="deepseek" <?php selected( $settings['provider'] ?? '', 'deepseek' ); ?>>DeepSeek</option>
+                        </select>
+                        <small class="hge-field-hint"><?php esc_html_e( 'SEO ve JSON odaklı bu akışlar için varsayılan öneri DeepSeek V4 Flash. Daha güçlü ama daha pahalı seçenek için V4 Pro kullanılabilir.', 'hge' ); ?></small>
+                    </div>
+
+                    <div class="hge-field">
+                        <label for="hge_ai_api_key"><?php esc_html_e( 'API Key', 'hge' ); ?></label>
                         <input
                             id="hge_ai_api_key"
                             name="hge_ai_settings[api_key]"
@@ -46,12 +55,31 @@
                     </div>
 
                     <div class="hge-field">
+                        <label for="hge_ai_base_url"><?php esc_html_e( 'Base URL (Opsiyonel)', 'hge' ); ?></label>
+                        <input
+                            id="hge_ai_base_url"
+                            name="hge_ai_settings[api_base_url]"
+                            type="url"
+                            class="hge-input"
+                            value="<?php echo esc_attr( $settings['api_base_url'] ?? '' ); ?>"
+                            placeholder="https://api.deepseek.com"
+                        />
+                        <small class="hge-field-hint"><?php esc_html_e( 'Boş bırakılırsa seçilen sağlayıcının resmi endpoint’i kullanılır. Proxy veya gateway kullanacaksanız buraya yazabilirsiniz.', 'hge' ); ?></small>
+                    </div>
+
+                    <div class="hge-field">
                         <label for="hge_ai_model"><?php esc_html_e( 'Model', 'hge' ); ?></label>
                         <select id="hge_ai_model" name="hge_ai_settings[model]" class="hge-select">
-                            <option value="gpt-5-mini" <?php selected( $settings['model'], 'gpt-5-mini' ); ?>>gpt-5-mini</option>
-                            <option value="o4-mini" <?php selected( $settings['model'], 'o4-mini' ); ?>>o4-mini</option>
+                            <optgroup label="OpenAI">
+                                <option value="gpt-5-mini" <?php selected( $settings['model'] ?? '', 'gpt-5-mini' ); ?>>gpt-5-mini</option>
+                                <option value="o4-mini" <?php selected( $settings['model'] ?? '', 'o4-mini' ); ?>>o4-mini</option>
+                            </optgroup>
+                            <optgroup label="DeepSeek">
+                                <option value="deepseek-v4-flash" <?php selected( $settings['model'] ?? '', 'deepseek-v4-flash' ); ?>>deepseek-v4-flash</option>
+                                <option value="deepseek-v4-pro" <?php selected( $settings['model'] ?? '', 'deepseek-v4-pro' ); ?>>deepseek-v4-pro</option>
+                            </optgroup>
                         </select>
-                        <small class="hge-field-hint"><?php esc_html_e( 'Varsayılan öneri: gpt-5-mini. o4-mini fallback olarak tutulabilir.', 'hge' ); ?></small>
+                        <small class="hge-field-hint"><?php esc_html_e( 'Pratik öneri: günlük fikir keşfi, metrik tahmini ve kısa SEO JSON çıktıları için deepseek-v4-flash; daha ağır analiz için deepseek-v4-pro.', 'hge' ); ?></small>
                     </div>
 
                     <div class="hge-field">
@@ -65,7 +93,7 @@
                             class="hge-input hge-input-small"
                             value="<?php echo esc_attr( (int) $settings['daily_limit'] ); ?>"
                         />
-                        <small class="hge-field-hint"><?php esc_html_e( 'Token kontrolü için her gün kaç yeni AI analizi yapılabileceğini sınırlar.', 'hge' ); ?></small>
+                        <small class="hge-field-hint"><?php esc_html_e( 'Her gün kaç yeni AI analizi yapılabileceğini sınırlar.', 'hge' ); ?></small>
                     </div>
 
                     <label class="hge-toggle-label">
@@ -106,6 +134,10 @@
                     <tr>
                         <td><?php esc_html_e( 'Bugünkü kullanım', 'hge' ); ?></td>
                         <td><strong><?php echo esc_html( number_format_i18n( $usage ) ); ?> / <?php echo esc_html( number_format_i18n( (int) $settings['daily_limit'] ) ); ?></strong></td>
+                    </tr>
+                    <tr>
+                        <td><?php esc_html_e( 'Seçili sağlayıcı', 'hge' ); ?></td>
+                        <td><strong><?php echo esc_html( ( new \HGE\API\OpenAIClient() )->get_provider_label( $settings['provider'] ?? 'openai' ) ); ?></strong></td>
                     </tr>
                     <tr>
                         <td><?php esc_html_e( 'Çalışma şekli', 'hge' ); ?></td>

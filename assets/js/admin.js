@@ -264,6 +264,92 @@
     } );
 
     // -------------------------------------------------------------------------
+    // Keyword hacim yukleme
+    // -------------------------------------------------------------------------
+    function renderVolumeResult( data ) {
+        const summary = data.summary || {};
+        const msg = data.message || 'Yukleme tamamlandi.';
+        const detail = `${ data.inserted_count || 0 } yeni, ${ data.skipped_count || 0 } tekrar keyword atlandi.`;
+
+        $( '#hge-keyword-volume-result' )
+            .prop( 'hidden', false )
+            .removeClass( 'is-error' )
+            .html( `<strong>${ msg }</strong><span>${ detail }</span>` );
+
+        if ( summary.total !== undefined ) {
+            $( '#hge-volume-total-keywords' ).text( Number( summary.total || 0 ).toLocaleString( 'tr-TR' ) );
+        }
+        if ( summary.total_volume !== undefined ) {
+            $( '#hge-volume-total-searches' ).text( Number( summary.total_volume || 0 ).toLocaleString( 'tr-TR' ) );
+        }
+        if ( summary.missing_metrics !== undefined ) {
+            $( '#hge-volume-missing-metrics' ).text( Number( summary.missing_metrics || 0 ).toLocaleString( 'tr-TR' ) );
+        }
+        if ( summary.latest_updated !== undefined ) {
+            $( '#hge-volume-latest-update' ).text( summary.latest_updated || '-' );
+        }
+    }
+
+    $( '#hge-keyword-volume-form' ).on( 'submit', function ( event ) {
+        event.preventDefault();
+
+        const fileInput = document.getElementById( 'hge_keyword_file' );
+        const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+        const $form = $( this );
+        const $button = $form.find( 'button[type="submit"]' );
+        const $result = $( '#hge-keyword-volume-result' );
+
+        if ( ! file ) {
+            $result.prop( 'hidden', false ).addClass( 'is-error' ).html( '<strong>Dosya secilmedi.</strong><span>Devam etmek icin bir metin dosyasi secin.</span>' );
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append( 'action', 'hge_import_keyword_volumes' );
+        formData.append( 'nonce', HGE.nonce );
+        formData.append( 'keyword_file', file );
+
+        $button.prop( 'disabled', true ).text( 'Isleniyor...' );
+        $result.prop( 'hidden', false ).removeClass( 'is-error' ).html( '<strong>Dosya yuklendi.</strong><span>Keywordler API ile isleniyor...</span>' );
+
+        $.ajax( {
+            url: HGE.ajax_url,
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+        } )
+            .done( res => {
+                if ( res.success ) {
+                    renderVolumeResult( res.data || {} );
+                    toast( res.data && res.data.message ? res.data.message : 'Keyword listesi islendi.', 'success' );
+                    setTimeout( () => location.reload(), 1200 );
+                } else {
+                    const msg = res.data && res.data.message ? res.data.message : HGE.i18n.error;
+                    $result.addClass( 'is-error' ).html( `<strong>Islem basarisiz.</strong><span>${ msg }</span>` );
+                    toast( msg, 'error' );
+                }
+            } )
+            .fail( xhr => {
+                const msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                    ? xhr.responseJSON.data.message
+                    : HGE.i18n.error;
+                $result.addClass( 'is-error' ).html( `<strong>Islem basarisiz.</strong><span>${ msg }</span>` );
+                toast( msg, 'error' );
+            } )
+            .always( () => {
+                $button.prop( 'disabled', false ).text( 'Listeyi Isle' );
+            } );
+    } );
+
+    $( '#hge-volume-search' ).on( 'input', function () {
+        const q = ( $( this ).val() || '' ).toString().toLowerCase();
+        $( '#hge-volume-table tbody tr' ).each( function () {
+            $( this ).toggle( $( this ).text().toLowerCase().includes( q ) );
+        } );
+    } );
+
+    // -------------------------------------------------------------------------
     // Tablo Filtreleme — Keyword Fırsatları
     // -------------------------------------------------------------------------
     $( '#hge-kw-search' ).on( 'input', function () {
@@ -701,7 +787,7 @@
             if ( text.includes( 'google ads' ) || text.includes( 'keyword planner' ) ) {
                 return 'Google Ads veya Keyword Planner ayarları eksik görünüyor. Ayarlar sayfasından kontrol edin.';
             }
-            if ( text.includes( 'ai' ) || text.includes( 'openai' ) || text.includes( 'api key' ) ) {
+            if ( text.includes( 'ai' ) || text.includes( 'openai' ) || text.includes( 'deepseek' ) || text.includes( 'api key' ) ) {
                 return 'AI entegrasyonu ayarları eksik görünüyor. Ayarlar sayfasından kontrol edin.';
             }
             return msg || 'Fırsat verileri alınamadı. API bağlantısını ve ayarları kontrol edin.';

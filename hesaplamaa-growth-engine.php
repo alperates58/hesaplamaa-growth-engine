@@ -44,6 +44,7 @@ function hge_load_files() {
         'includes/admin/class-menu.php',
         'includes/admin/class-dashboard.php',
         'includes/admin/class-keyword-opportunities.php',
+        'includes/admin/class-keyword-volume-importer.php',
         'includes/admin/class-page-analysis.php',
         'includes/admin/class-index-status.php',
         'includes/admin/class-suggestion-archive.php',

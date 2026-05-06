@@ -42,6 +42,13 @@ class Menu {
             ],
             [
                 'parent' => 'hge-dashboard',
+                'title'  => __( 'Keyword Hacim Yükle', 'hge' ),
+                'menu'   => __( 'Keyword Hacim Yükle', 'hge' ),
+                'slug'   => 'hge-keyword-volume-importer',
+                'cb'     => [ $this, 'render_keyword_volume_importer' ],
+            ],
+            [
+                'parent' => 'hge-dashboard',
                 'title'  => __( 'Mevcut Sayfa Analizi', 'hge' ),
                 'menu'   => __( 'Sayfa Analizi', 'hge' ),
                 'slug'   => 'hge-page-analysis',
@@ -116,6 +123,10 @@ class Menu {
 
     public function render_opportunities(){
         ( new KeywordOpportunities() )->render();
+    }
+
+    public function render_keyword_volume_importer(){
+        ( new KeywordVolumeImporter() )->render();
     }
 
     public function render_page_analysis(){

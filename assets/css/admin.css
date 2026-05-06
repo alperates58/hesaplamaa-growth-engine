@@ -588,6 +588,55 @@ input[type="submit"].hge-btn { height: auto; padding: 10px 24px; }
 .hge-inline-result.error { color: var(--hge-red); }
 .hge-update-card .hge-status-table { margin-bottom: 16px; }
 
+.hge-keyword-volume-form {
+    display: grid;
+    gap: 16px;
+}
+
+.hge-keyword-volume-upload {
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.hge-keyword-volume-upload .hge-field {
+    flex: 1 1 380px;
+    margin: 0;
+}
+
+.hge-keyword-volume-result {
+    display: grid;
+    gap: 6px;
+    padding: 14px 16px;
+    border: 1px solid #bfe4d1;
+    border-radius: 14px;
+    background: #edf9f3;
+    color: #14532d;
+}
+
+.hge-keyword-volume-result.is-error {
+    border-color: #f0c4c1;
+    background: #fff4f3;
+    color: #991b1b;
+}
+
+.hge-keyword-volume-result strong,
+.hge-keyword-volume-result span {
+    display: block;
+}
+
+.hge-keyword-volume-stats {
+    margin-top: 0;
+}
+
+@media (max-width: 782px) {
+    .hge-keyword-volume-upload .hge-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
 /* ----- OAuth Steps ----- */
 .hge-oauth-steps { display: flex; flex-direction: column; gap: 16px; }
 .hge-step { display: flex; gap: 14px; align-items: flex-start; }
