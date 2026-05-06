@@ -71,6 +71,10 @@ class NewIdeas {
                 continue;
             }
 
+            if ( ! $this->suggest->is_topic_keyword_relevant( $keyword, $topic ) ) {
+                continue;
+            }
+
             $merged[ $this->normalize_keyword_key( $keyword ) ] = [
                 'keyword'           => $keyword,
                 'seed'              => $topic,
@@ -103,6 +107,10 @@ class NewIdeas {
         $metrics  = $this->suggest->get_ai_metric_estimates( array_column( $enriched, 'keyword' ) );
 
         foreach ( $enriched as $index => $item ) {
+            if ( ! $this->suggest->is_topic_keyword_relevant( (string) ( $item['keyword'] ?? '' ), $topic ) ) {
+                continue;
+            }
+
             $key      = $this->normalize_keyword_key( $item['keyword'] ?? '' );
             $ai_score = (int) ( $merged[ $key ]['opportunity_score'] ?? 0 );
             if ( isset( $metrics[ $item['keyword'] ] ) ) {

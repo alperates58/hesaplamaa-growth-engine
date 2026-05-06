@@ -207,11 +207,11 @@
     // Önerileri Yenile
     // -------------------------------------------------------------------------
     $( '#hge-refresh-suggestions' ).on( 'click', function () {
-        if ( ! confirm( 'Google Suggest\'ten yeni öneriler çekilsin mi? Bu işlem birkaç dakika sürebilir.' ) ) return;
+        if ( ! confirm( 'Google Suggest verileri yeniden çekilsin mi? Bu işlem birkaç dakika sürebilir.' ) ) return;
         ajaxRequest( 'hge_get_suggestions', {}, this )
             .done( res => {
                 if ( res.success ) {
-                    toast( 'Öneriler güncellendi.', 'success' );
+                    toast( 'Fırsat listesi güncellendi.', 'success' );
                     setTimeout( () => location.reload(), 1200 );
                 }
             } )
@@ -425,94 +425,292 @@
     // Yeni Fikirler - kart liste ve detay paneli
     // -------------------------------------------------------------------------
     function initIdeasWorkspace() {
+        const $app = $( '.hge-ideas-app' );
         const $list = $( '#hge-ideas-list' );
-        if ( ! $list.length ) return;
+        const $table = $( '#hge-ideas-table-v2 tbody' );
+        if ( ! $app.length || ! $list.length ) return;
 
         ideasState.visibleLimit = 12;
         ideasState.segment = 'all';
+        ideasState.view = 'cards';
+        ideasState.sort = 'score_desc';
 
         function cards() {
             return $list.find( '.hge-idea-card' );
         }
 
-        function filteredCards() {
-            const q = ( $( '#hge-idea-search' ).val() || '' ).toString().toLowerCase();
-            return cards().filter( function () {
-                const $card   = $( this );
-                const keyword = ( $card.data( 'keyword' ) || '' ).toString().toLowerCase();
-                const exists  = parseInt( $card.data( 'exists' ), 10 ) === 1;
-                const quick   = parseInt( $card.data( 'quick' ), 10 ) === 1;
-
-                if ( q && ! keyword.includes( q ) ) return false;
-                if ( ideasState.segment === 'missing' && exists ) return false;
-                if ( ideasState.segment === 'quick' && ! quick ) return false;
-                return true;
-            } );
+        function rows() {
+            return $table.find( 'tr' );
         }
 
-        function selectCard( card ) {
-            const $card      = $( card );
-            const keyword    = ( $card.data( 'keyword' ) || '' ).toString();
-            const score      = parseInt( $card.data( 'score' ) || 0, 10 );
-            const volume     = parseInt( $card.data( 'volume' ) || 0, 10 );
-            const exists     = parseInt( $card.data( 'exists' ), 10 ) === 1;
-            const comp       = ( $card.data( 'competition' ) || 'UNKNOWN' ).toString();
-            const compLabel  = ( $card.data( 'competition-label' ) || 'Bilinmiyor' ).toString();
-            const difficulty = comp === 'LOW' ? 'Düşük' : comp === 'MEDIUM' ? 'Orta' : comp === 'HIGH' ? 'Yüksek' : 'Veri bekleniyor';
-            const actionType = exists ? 'İçeriği güçlendir' : score >= 75 ? 'Hesaplama aracı aç' : 'İçerik planla';
-
-            cards().removeClass( 'is-selected' );
-            $card.addClass( 'is-selected' );
-
-            $( '#hge-detail-title' ).text( keyword );
-            $( '#hge-detail-score' ).text( score );
-            $( '#hge-detail-difficulty' ).text( difficulty );
-            $( '#hge-detail-action-type' ).text( actionType );
-            $( '#hge-detail-why' ).text(
-                exists
-                    ? `"${ keyword }" zaten sitede var. Skor, mevcut sayfanın daha iyi başlık, hesaplama örneği ve iç linklerle büyütülebileceğini gösteriyor.`
-                    : `"${ keyword }" için sitede karşılık yok. Bu boşluk yeni organik trafik ve dönüşüm odaklı hesaplama sayfası fırsatı yaratıyor.`
-            );
-            $( '#hge-detail-competitors' ).text(
-                comp === 'UNKNOWN'
-                    ? 'Rekabet verisi henüz netleşmedi. Google sonuçları tarandıktan sonra öncelik tekrar değerlendirilmeli.'
-                    : `${ compLabel } rekabet sinyali var. ${ volume > 0 ? 'Aranma hacmi de karar sürecine dahil edilmeli.' : 'Hacim verisi gelene kadar fırsat skoru öncelikli okunmalı.' }`
-            );
-            $( '#hge-detail-recommendation' ).text(
-                score >= 75 && ! exists
-                    ? 'Öncelik hesaplama aracı olmalı. Kısa açıklama, formül, örnek sonuç ve SSS bloğu ile yayınlanabilir.'
-                    : 'Önce içerik iskeleti hazırlanmalı. Arama niyeti doğrulandıktan sonra hesaplama modülü eklenebilir.'
-            );
-            $( '#hge-ai-insight-result' ).prop( 'hidden', true );
-            $( '#hge-ai-insight-status' ).removeClass( 'is-error' ).text( '' );
+        function getItems() {
+            return cards().map( function () {
+                return $( this );
+            } ).get();
         }
 
-        function renderCards() {
-            const $cards   = cards();
-            const filtered = filteredCards();
-            const count    = Math.min( filtered.length, ideasState.visibleLimit );
+        function normalizeText( value ) {
+            return ( value || '' ).toString().toLowerCase();
+        }
 
-            $cards.hide().removeClass( 'hge-filtered-out' );
-            $cards.not( filtered ).addClass( 'hge-filtered-out' );
-            filtered.each( function ( index ) {
-                $( this ).toggle( index < ideasState.visibleLimit );
-            } );
+        function metricLabel( metricState ) {
+            if ( metricState === 'verified' ) return 'Keyword Planner';
+            if ( metricState === 'estimate' ) return 'Tahmini';
+            return 'Kontrol edilmedi';
+        }
 
-            $( '#hge-ideas-count' ).text(
-                filtered.length
-                    ? `${ count } / ${ filtered.length } fırsat gösteriliyor`
-                    : 'Bu filtrede fırsat yok'
-            );
-            $( '#hge-load-more-ideas' ).prop( 'disabled', count >= filtered.length );
+        function itemMatches( $item ) {
+            const q = normalizeText( $( '#hge-idea-search' ).val() );
+            const keyword = normalizeText( $item.data( 'keyword' ) );
+            const category = normalizeText( $item.data( 'category' ) );
+            const siteStatus = normalizeText( $item.data( 'site-status' ) );
+            const pageType = normalizeText( $item.data( 'page-type' ) );
+            const exists = parseInt( $item.data( 'exists' ), 10 ) === 1;
+            const quick = parseInt( $item.data( 'quick' ), 10 ) === 1;
+            const volume = parseInt( $item.data( 'volume' ) || 0, 10 );
+            const competition = ( $item.data( 'competition' ) || 'UNKNOWN' ).toString();
 
-            if ( filtered.length && ! filtered.filter( '.is-selected' ).length ) {
-                selectCard( filtered.first() );
+            if ( q && ! `${ keyword } ${ category } ${ siteStatus } ${ pageType }`.includes( q ) ) {
+                return false;
+            }
+
+            switch ( ideasState.segment ) {
+                case 'missing':
+                    return ! exists;
+                case 'quick':
+                    return quick;
+                case 'high-volume':
+                    return volume >= 1000;
+                case 'low-competition':
+                    return competition === 'LOW';
+                case 'tool':
+                    return pageType.includes( 'hesaplama aracı' );
+                case 'update':
+                    return siteStatus.includes( 'güncelleme' );
+                case 'finans':
+                case 'maaş':
+                case 'araç':
+                case 'sağlık':
+                    return category === ideasState.segment;
+                case 'tarih':
+                    return category === 'tarih';
+                default:
+                    return true;
             }
         }
 
-        $( '#hge-idea-search' ).off( '.hgeIdeas' ).on( 'input.hgeIdeas', function () {
+        function getFilteredItems() {
+            const items = getItems().filter( item => itemMatches( item ) );
+
+            items.sort( ( a, b ) => {
+                const scoreA = parseInt( a.data( 'score' ) || 0, 10 );
+                const scoreB = parseInt( b.data( 'score' ) || 0, 10 );
+                const volumeA = parseInt( a.data( 'volume' ) || 0, 10 );
+                const volumeB = parseInt( b.data( 'volume' ) || 0, 10 );
+                const competitionA = parseInt( a.data( 'competition-rank' ) || 99, 10 );
+                const competitionB = parseInt( b.data( 'competition-rank' ) || 99, 10 );
+                const existsA = parseInt( a.data( 'exists' ) || 0, 10 );
+                const existsB = parseInt( b.data( 'exists' ) || 0, 10 );
+                const createdA = ( a.data( 'created-at' ) || '' ).toString();
+                const createdB = ( b.data( 'created-at' ) || '' ).toString();
+
+                switch ( ideasState.sort ) {
+                    case 'volume_desc':
+                        return volumeB - volumeA || scoreB - scoreA;
+                    case 'competition_asc':
+                        return competitionA - competitionB || scoreB - scoreA;
+                    case 'newest':
+                        return createdB.localeCompare( createdA ) || scoreB - scoreA;
+                    case 'missing_first':
+                        return existsA - existsB || scoreB - scoreA;
+                    default:
+                        return scoreB - scoreA || volumeB - volumeA;
+                }
+            } );
+
+            return items;
+        }
+
+        function setLoadingState( enabled, message ) {
+            $( '#hge-ideas-loading' ).prop( 'hidden', ! enabled );
+            if ( enabled ) {
+                $( '#hge-loading-message' ).text( message || 'AI fikirleri hazırlanıyor' );
+            }
+        }
+
+        function scheduleLoadingMessages( messages ) {
+            let index = 0;
+            setLoadingState( true, messages[0] );
+            const timer = setInterval( () => {
+                index += 1;
+                if ( index >= messages.length ) {
+                    clearInterval( timer );
+                    return;
+                }
+                $( '#hge-loading-message' ).text( messages[ index ] );
+            }, 900 );
+            return timer;
+        }
+
+        function setFeedback( message, tone = 'info' ) {
+            const $box = $( '#hge-topic-discovery-feedback' );
+            $box.removeClass( 'is-info is-success is-error is-warning' ).addClass( `is-${ tone }` );
+            $( '#hge-topic-feedback-message' ).text( message );
+        }
+
+        function syncSelection( keyword ) {
+            cards().removeClass( 'is-selected' );
+            rows().removeClass( 'is-selected' );
+
+            const $card = cards().filter( function () {
+                return $( this ).data( 'keyword' ) === keyword;
+            } ).first();
+            const $row = rows().filter( function () {
+                return $( this ).data( 'keyword' ) === keyword;
+            } ).first();
+
+            $card.addClass( 'is-selected' );
+            $row.addClass( 'is-selected' );
+
+            return $card.length ? $card : $row;
+        }
+
+        function buildWhyText( keyword, volume, exists, competitionLabel, metricState, siteStatus ) {
+            const parts = [];
+
+            if ( volume >= 5000 ) {
+                parts.push( `"${ keyword }" yüksek arama talebi taşıyor.` );
+            } else if ( volume >= 1000 ) {
+                parts.push( `"${ keyword }" düzenli arama hacmi olan bir fırsat.` );
+            } else if ( metricState !== 'verified' ) {
+                parts.push( 'Keyword Planner verisi gelmediği için metrikler tahmini veya kontrol edilmedi durumda.' );
+            }
+
+            if ( ! exists ) {
+                parts.push( 'Sitede doğrudan karşılığı görünmüyor; bu da yeni sayfa açmak için net bir boşluk yaratıyor.' );
+            } else if ( siteStatus.toLowerCase().includes( 'güncelleme' ) ) {
+                parts.push( 'Benzer bir sayfa var ancak güncel sürüm veya kapsam genişletmesi gerekiyor.' );
+            } else {
+                parts.push( 'Mevcut sayfa bulunduğu için bu fırsat içerik derinliği ve araç deneyimiyle büyütülebilir.' );
+            }
+
+            if ( competitionLabel === 'Düşük' || competitionLabel === 'Orta' ) {
+                parts.push( 'Rekabet seviyesi hızlı kazanım için uygun görünüyor.' );
+            }
+
+            return parts.join( ' ' );
+        }
+
+        function buildChecklist( exists, pageType, siteStatus ) {
+            const items = [];
+
+            if ( ! exists && pageType === 'Hesaplama aracı' ) {
+                items.push( 'Hesaplama aracı akışını ve gerekli form alanlarını planla.' );
+            } else if ( siteStatus.toLowerCase().includes( 'güncelleme' ) ) {
+                items.push( 'Mevcut sayfanın başlık, hesaplama mantığı ve güncel veri alanlarını yenile.' );
+            } else {
+                items.push( 'Arama niyetini destekleyen içerik iskeletini ve sayfa şablonunu netleştir.' );
+            }
+
+            items.push( 'SERP rakiplerini ve öne çıkan soru kalıplarını incele.' );
+            items.push( 'Başlık, meta açıklama ve iç link planını oluştur.' );
+            items.push( 'Yayın sonrası performans takibi için fırsatı plan listesine ekle.' );
+
+            return items;
+        }
+
+        function selectCard( sourceEl ) {
+            const $source = $( sourceEl );
+            const keyword = ( $source.data( 'keyword' ) || '' ).toString();
+            if ( ! keyword ) return;
+
+            const $item = syncSelection( keyword );
+            const score = parseInt( $item.data( 'score' ) || 0, 10 );
+            const volume = parseInt( $item.data( 'volume' ) || 0, 10 );
+            const exists = parseInt( $item.data( 'exists' ), 10 ) === 1;
+            const competition = ( $item.data( 'competition' ) || 'UNKNOWN' ).toString();
+            const competitionLabel = ( $item.data( 'competition-label' ) || 'Bilinmiyor' ).toString();
+            const pageType = ( $item.data( 'page-type' ) || 'İçerik fırsatı' ).toString();
+            const siteStatus = ( $item.data( 'site-status' ) || 'Kontrol edilmedi' ).toString();
+            const priority = ( $item.data( 'priority' ) || 'İzlemeye al' ).toString();
+            const metricState = ( $item.data( 'metric-state' ) || 'unknown' ).toString();
+            const actionType = exists ? 'Mevcut sayfayı güncelle' : pageType === 'Hesaplama aracı' ? 'Hesaplama aracı aç' : 'İçerik taslağı oluştur';
+            const difficulty = competition === 'LOW' ? 'Düşük' : competition === 'MEDIUM' ? 'Orta' : competition === 'HIGH' ? 'Yüksek' : 'Bilinmiyor';
+
+            $( '#hge-detail-title' ).text( keyword );
+            $( '#hge-detail-score' ).text( score );
+            $( '#hge-detail-volume' ).text( volume > 0 ? `${ volume.toLocaleString( 'tr-TR' ) } (${ metricLabel( metricState ) })` : metricLabel( metricState ) );
+            $( '#hge-detail-difficulty' ).text( difficulty );
+            $( '#hge-detail-site-status' ).text( siteStatus );
+            $( '#hge-detail-page-type' ).text( pageType );
+            $( '#hge-detail-priority' ).text( priority );
+            $( '#hge-detail-action-type' ).text( actionType );
+            $( '#hge-detail-match' ).text( exists ? 'Mevcut eşleşme bulundu. URL bilgisi bu veri setinde tutulmadığı için detay gösterilemiyor.' : 'Mevcut eşleşme kontrol edilmedi.' );
+            $( '#hge-detail-why' ).text( buildWhyText( keyword, volume, exists, competitionLabel, metricState, siteStatus ) );
+
+            const $checklist = $( '#hge-detail-checklist' ).empty();
+            buildChecklist( exists, pageType, siteStatus ).forEach( item => {
+                $( '<li />' ).text( item ).appendTo( $checklist );
+            } );
+
+            $( '#hge-ai-insight-result' ).prop( 'hidden', true );
+            $( '#hge-ai-insight-status' ).removeClass( 'is-error' ).text( 'AI ile SEO planı üretildiğinde slug, başlık ve meta alanları burada görünür.' );
+        }
+
+        function renderItems() {
+            const filtered = getFilteredItems();
+            const visible = filtered.slice( 0, ideasState.visibleLimit );
+            const visibleKeywords = new Set( visible.map( item => item.data( 'keyword' ) ) );
+
+            cards().each( function () {
+                const $card = $( this );
+                const keyword = $card.data( 'keyword' );
+                $card.toggle( visibleKeywords.has( keyword ) );
+                $card.toggleClass( 'hge-filtered-out', ! filtered.some( item => item.data( 'keyword' ) === keyword ) );
+            } );
+
+            rows().each( function () {
+                const $row = $( this );
+                const keyword = $row.data( 'keyword' );
+                $row.toggle( visibleKeywords.has( keyword ) );
+                $row.toggleClass( 'hge-filtered-out', ! filtered.some( item => item.data( 'keyword' ) === keyword ) );
+            } );
+
+            const shown = Math.min( filtered.length, ideasState.visibleLimit );
+            $( '#hge-ideas-count' ).text(
+                filtered.length
+                    ? `${ shown } / ${ filtered.length } fırsat gösteriliyor`
+                    : 'Bu filtrede fırsat bulunamadı'
+            );
+            $( '#hge-load-more-ideas' ).prop( 'disabled', shown >= filtered.length );
+
+            const selectedVisible = filtered.some( item => item.hasClass( 'is-selected' ) );
+            if ( filtered.length && ! selectedVisible ) {
+                selectCard( filtered[0] );
+            }
+        }
+
+        function showView( view ) {
+            ideasState.view = view;
+            $( '[data-ideas-view]' ).removeClass( 'is-active' ).filter( `[data-ideas-view="${ view }"]` ).addClass( 'is-active' );
+            $( '[data-view-panel]' ).removeClass( 'is-active' ).filter( `[data-view-panel="${ view }"]` ).addClass( 'is-active' );
+        }
+
+        function classifyErrorMessage( msg ) {
+            const text = normalizeText( msg );
+            if ( text.includes( 'google ads' ) || text.includes( 'keyword planner' ) ) {
+                return 'Google Ads veya Keyword Planner ayarları eksik görünüyor. Ayarlar sayfasından kontrol edin.';
+            }
+            if ( text.includes( 'ai' ) || text.includes( 'openai' ) || text.includes( 'api key' ) ) {
+                return 'AI entegrasyonu ayarları eksik görünüyor. Ayarlar sayfasından kontrol edin.';
+            }
+            return msg || 'Fırsat verileri alınamadı. API bağlantısını ve ayarları kontrol edin.';
+        }
+
+        $( '#hge-idea-search, #hge-idea-sort' ).off( '.hgeIdeas' ).on( 'input.hgeIdeas change.hgeIdeas', function () {
             ideasState.visibleLimit = 12;
-            renderCards();
+            ideasState.sort = $( '#hge-idea-sort' ).val() || 'score_desc';
+            renderItems();
         } );
 
         $( document ).off( 'click.hgeIdeasSegment' ).on( 'click.hgeIdeasSegment', '[data-idea-segment]', function () {
@@ -520,12 +718,22 @@
             ideasState.visibleLimit = 12;
             $( '[data-idea-segment]' ).removeClass( 'is-active' );
             $( this ).addClass( 'is-active' );
-            renderCards();
+            renderItems();
+        } );
+
+        $( document ).off( 'click.hgeIdeasView' ).on( 'click.hgeIdeasView', '[data-ideas-view]', function () {
+            showView( $( this ).data( 'ideas-view' ) );
         } );
 
         $( '#hge-load-more-ideas' ).off( '.hgeIdeas' ).on( 'click.hgeIdeas', function () {
             ideasState.visibleLimit += 12;
-            renderCards();
+            renderItems();
+        } );
+
+        $( document ).off( 'click.hgeTopicChip' ).on( 'click.hgeTopicChip', '[data-topic-chip]', function () {
+            const topic = $( this ).data( 'topic-chip' );
+            $( '#hge-ai-topic-input' ).val( topic );
+            setFeedback( `"${ topic }" konusu hazır. AI ile öneri oluşturabilirsiniz.`, 'info' );
         } );
 
         $( '#hge-ai-topic-btn' ).off( '.hgeIdeas' ).on( 'click.hgeIdeas', function () {
@@ -533,61 +741,99 @@
             const topic = ( $( '#hge-ai-topic-input' ).val() || '' ).toString().trim();
 
             if ( ! topic ) {
-                toast( 'Bir konu girin: sağlık, finans, zaman gibi.', 'error' );
+                setFeedback( 'Öneri üretmek için önce bir konu girin.', 'error' );
+                toast( 'Öneri üretmek için önce bir konu girin.', 'error' );
                 return;
             }
 
-            $btn.prop( 'disabled', true ).text( 'AI tarıyor...' );
+            const timer = scheduleLoadingMessages( [
+                'AI başlık önerileri hazırlanıyor...',
+                'Keyword Planner verileri alınıyor...',
+                'Fırsat puanları hesaplanıyor...',
+            ] );
+
+            setFeedback( `"${ topic }" için konu odaklı öneriler hazırlanıyor.`, 'info' );
+            $btn.prop( 'disabled', true ).text( 'AI çalışıyor...' );
 
             ajaxRequest( 'hge_ai_topic_ideas', { topic } )
                 .done( res => {
                     if ( res.success ) {
+                        setFeedback( 'Konu odaklı fırsatlar hazırlandı. Liste yenileniyor.', 'success' );
                         toast( 'AI konu fikirleri eklendi. Liste yenileniyor.', 'success' );
                         setTimeout( () => location.reload(), 900 );
                     } else {
-                        toast( res.data.message || HGE.i18n.error, 'error' );
+                        const msg = classifyErrorMessage( res.data.message || HGE.i18n.error );
+                        setFeedback( msg, 'error' );
+                        toast( msg, 'error' );
                     }
                 } )
                 .fail( xhr => {
-                    const msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                    const raw = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
                         ? xhr.responseJSON.data.message
                         : HGE.i18n.error;
+                    const msg = classifyErrorMessage( raw );
+                    setFeedback( msg, 'error' );
                     toast( msg, 'error' );
                 } )
                 .always( () => {
+                    clearInterval( timer );
+                    setLoadingState( false );
                     $btn.prop( 'disabled', false ).text( 'AI ile konu öner' );
                 } );
         } );
 
         $( '#hge-ai-global-btn' ).off( '.hgeIdeas' ).on( 'click.hgeIdeas', function () {
             const $btn = $( this );
+            const timer = scheduleLoadingMessages( [
+                'AI fikirleri hazırlanıyor...',
+                'Keyword Planner verileri alınıyor...',
+                'Fırsatlar sıralanıyor...',
+            ] );
 
-            $btn.prop( 'disabled', true ).text( 'AI kesfediyor...' );
+            setFeedback( 'Mevcut veri kaynaklarına göre tüm fırsatlar taranıyor.', 'info' );
+            $btn.prop( 'disabled', true ).text( 'Fırsatlar taranıyor...' );
 
             ajaxRequest( 'hge_ai_global_ideas' )
                 .done( res => {
                     if ( res.success ) {
-                        toast( 'AI tum hesaplama firsatlarini ekledi. Liste yenileniyor.', 'success' );
+                        setFeedback( 'Genel fırsat taraması tamamlandı. Liste yenileniyor.', 'success' );
+                        toast( 'Tüm fırsatlar yenilendi. Liste yenileniyor.', 'success' );
                         setTimeout( () => location.reload(), 900 );
                     } else {
-                        toast( res.data.message || HGE.i18n.error, 'error' );
+                        const msg = classifyErrorMessage( res.data.message || HGE.i18n.error );
+                        setFeedback( msg, 'error' );
+                        toast( msg, 'error' );
                     }
                 } )
                 .fail( xhr => {
-                    const msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                    const raw = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
                         ? xhr.responseJSON.data.message
                         : HGE.i18n.error;
+                    const msg = classifyErrorMessage( raw );
+                    setFeedback( msg, 'error' );
                     toast( msg, 'error' );
                 } )
                 .always( () => {
-                    $btn.prop( 'disabled', false ).text( 'Tum firsatlari kesfet' );
+                    clearInterval( timer );
+                    setLoadingState( false );
+                    $btn.prop( 'disabled', false ).text( 'Fırsatları keşfet' );
                 } );
         } );
 
-        $( document ).off( 'click.hgeIdeasCard keydown.hgeIdeasCard' ).on( 'click.hgeIdeasCard keydown.hgeIdeasCard', '.hge-idea-card', function ( event ) {
+        $( document ).off( 'click.hgeIdeasCard keydown.hgeIdeasCard' ).on( 'click.hgeIdeasCard keydown.hgeIdeasCard', '.hge-idea-card, #hge-ideas-table-v2 tbody tr', function ( event ) {
             if ( event.type === 'keydown' && event.key !== 'Enter' && event.key !== ' ' ) return;
+            if ( $( event.target ).closest( 'button' ).length && ! $( event.target ).is( '.hge-idea-table-link' ) ) return;
             event.preventDefault();
             selectCard( this );
+        } );
+
+        $( document ).off( 'click.hgeIdeasAction' ).on( 'click.hgeIdeasAction', '[data-idea-action="seo"]', function ( event ) {
+            event.preventDefault();
+            const $scope = $( this ).closest( '.hge-idea-card, tr' );
+            if ( $scope.length ) {
+                selectCard( $scope );
+            }
+            $( '#hge-ai-insight-btn' ).trigger( 'click' );
         } );
 
         $( '#hge-ai-insight-btn' ).off( '.hgeIdeas' ).on( 'click.hgeIdeas', function () {
@@ -595,8 +841,8 @@
             const $selected = cards().filter( '.is-selected' ).first();
             if ( ! $selected.length ) return;
 
-            $btn.prop( 'disabled', true ).text( 'AI analiz ediyor...' );
-            $( '#hge-ai-insight-status' ).removeClass( 'is-error' ).text( 'Kısa brief hazırlanıyor. Cache varsa token harcanmaz.' );
+            $btn.prop( 'disabled', true ).text( 'SEO planı üretiliyor...' );
+            $( '#hge-ai-insight-status' ).removeClass( 'is-error' ).text( 'AI ile SEO planı hazırlanıyor. Cache varsa mevcut plan gösterilir.' );
 
             ajaxRequest( 'hge_ai_keyword_insight', {
                 keyword: $selected.data( 'keyword' ) || '',
@@ -607,44 +853,48 @@
             } )
                 .done( res => {
                     if ( ! res.success ) {
-                        const msg = res.data && res.data.message ? res.data.message : HGE.i18n.error;
+                        const msg = classifyErrorMessage( res.data && res.data.message ? res.data.message : HGE.i18n.error );
                         $( '#hge-ai-insight-status' ).addClass( 'is-error' ).text( msg );
                         return;
                     }
 
                     renderAiInsight( res.data.insight || {} );
-                    $( '#hge-ai-insight-status' ).text( res.data.cached ? 'Cache sonucu gösteriliyor.' : 'Yeni AI analizi hazır.' );
+                    $( '#hge-ai-insight-status' ).text( res.data.cached ? 'Kayıtlı SEO planı gösteriliyor.' : 'Yeni SEO planı hazır.' );
                 } )
                 .fail( xhr => {
-                    const msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                    const raw = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
                         ? xhr.responseJSON.data.message
                         : HGE.i18n.error;
-                    $( '#hge-ai-insight-status' ).addClass( 'is-error' ).text( msg );
+                    $( '#hge-ai-insight-status' ).addClass( 'is-error' ).text( classifyErrorMessage( raw ) );
                 } )
                 .always( () => {
-                    $btn.prop( 'disabled', false ).text( 'AI ile analiz et' );
+                    $btn.prop( 'disabled', false ).text( 'AI ile SEO planı üret' );
                 } );
         } );
 
         function renderAiInsight( insight ) {
+            const titles = ( insight.titles || [] ).slice( 0, 5 );
             $( '#hge-ai-content-angle' ).text( insight.content_angle || insight.why_important || '-' );
-            $( '#hge-ai-calculator-idea' ).text( insight.calculator_idea || '-' );
+            $( '#hge-ai-calculator-idea' ).text( insight.calculator_idea || insight.recommended_type || '-' );
             $( '#hge-ai-meta-title' ).text( insight.meta_title || '-' );
             $( '#hge-ai-meta-description' ).text( insight.meta_description || '-' );
             $( '#hge-ai-slug' ).text( insight.slug || '-' );
+            $( '#hge-ai-h1' ).text( titles[0] || insight.meta_title || '-' );
 
             const $titles = $( '#hge-ai-title-list' ).empty();
-            ( insight.titles || [] ).slice( 0, 5 ).forEach( title => {
+            titles.forEach( title => {
                 $( '<li />' ).text( title ).appendTo( $titles );
             } );
+
             if ( ! $titles.children().length ) {
-                $( '<li />' ).text( 'Başlık önerisi alınamadı.' ).appendTo( $titles );
+                $( '<li />' ).text( 'AI ile H2 fikri üretilemedi.' ).appendTo( $titles );
             }
 
             $( '#hge-ai-insight-result' ).prop( 'hidden', false );
         }
 
-        renderCards();
+        showView( 'cards' );
+        renderItems();
         selectCard( cards().filter( '.is-selected' ).first().length ? cards().filter( '.is-selected' ).first() : cards().first() );
     }
 

@@ -141,6 +141,10 @@ class SuggestClient {
         return $results;
     }
 
+    public function is_topic_keyword_relevant( string $keyword, string $topic ){
+        return $this->is_topic_relevant( $keyword, $topic );
+    }
+
     /**
      * Sitenin mevcut URL'lerini al ve eşleştir
      */
@@ -255,6 +259,23 @@ class SuggestClient {
                 'yumurtlama hesaplama',
                 'protein ihtiyacı hesaplama',
                 'su ihtiyacı hesaplama',
+                'bazal metabolizma hesaplama',
+                'bel kalça oranı hesaplama',
+                'vücut yağ oranı hesaplama',
+                'doğum tarihi gebelik hesaplama',
+            ],
+            'gebelik' => [
+                'gebelik hesaplama',
+                'gebelik haftası hesaplama',
+                'hamilelik hesaplama',
+                'yumurtlama hesaplama',
+                'doğum tarihi hesaplama',
+            ],
+            'vki' => [
+                'vki hesaplama',
+                'vücut kitle indeksi hesaplama',
+                'bmi hesaplama',
+                'ideal kilo hesaplama',
             ],
             'finans' => [
                 'finans hesaplama',
@@ -263,6 +284,14 @@ class SuggestClient {
                 'mevduat hesaplama',
                 'taksit hesaplama',
                 'enflasyon hesaplama',
+            ],
+            'kredi' => [
+                'kredi hesaplama',
+                'ihtiyaç kredisi hesaplama',
+                'konut kredisi hesaplama',
+                'araç kredisi hesaplama',
+                'taksit hesaplama',
+                'faiz hesaplama',
             ],
         ];
 
@@ -329,8 +358,11 @@ class SuggestClient {
         $topic_terms = [
             'zaman' => [ 'zaman', 'tarih', 'gun', 'gün', 'hafta', 'ay', 'yil', 'yıl', 'saat', 'dakika', 'mesai', 'is gunu', 'iş günü', 'yas', 'yaş', 'dogum', 'doğum', 'kac gun', 'kaç gün' ],
             'tarih' => [ 'tarih', 'gun', 'gün', 'hafta', 'ay', 'yil', 'yıl', 'saat', 'mesai', 'is gunu', 'iş günü', 'kac gun', 'kaç gün' ],
-            'saglik' => [ 'saglik', 'sağlık', 'kilo', 'vucut', 'vücut', 'bmi', 'kalori', 'gebelik', 'hamilelik', 'yumurtlama', 'protein', 'su ihtiyaci', 'su ihtiyacı', 'tansiyon', 'bel kalca', 'bel kalça', 'metabolizma' ],
+            'saglik' => [ 'saglik', 'sağlık', 'kilo', 'vucut', 'vücut', 'bmi', 'vki', 'kalori', 'gebelik', 'hamilelik', 'yumurtlama', 'protein', 'su ihtiyaci', 'su ihtiyacı', 'tansiyon', 'bel kalca', 'bel kalça', 'metabolizma', 'yag orani', 'yağ oranı', 'bazal' ],
+            'gebelik' => [ 'gebelik', 'hamilelik', 'yumurtlama', 'doğum tarihi', 'gebelik haftası', 'gebelik hesaplama' ],
+            'vki' => [ 'vki', 'bmi', 'vücut kitle', 'ideal kilo', 'kalori', 'metabolizma' ],
             'finans' => [ 'finans', 'kredi', 'faiz', 'maas', 'maaş', 'vergi', 'mevduat', 'taksit', 'enflasyon', 'kur', 'doviz', 'döviz', 'kredi karti', 'kredi kartı' ],
+            'kredi' => [ 'kredi', 'faiz', 'taksit', 'konut', 'ihtiyaç kredisi', 'araç kredisi', 'kredi kartı' ],
         ];
 
         $terms = $topic_terms[ $topic_lc ] ?? [ $topic_lc ];
