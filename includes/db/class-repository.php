@@ -481,7 +481,8 @@ class Repository {
     }
 
     public function get_keyword_volumes( array $filters = [] ){
-        $limit  = max( 20, min( 500, (int) ( $filters['limit'] ?? 200 ) ) );
+        $limit  = max( 20, min( 10000, (int) ( $filters['limit'] ?? 200 ) ) );
+        $offset = max( 0, (int) ( $filters['offset'] ?? 0 ) );
         $search = sanitize_text_field( (string) ( $filters['search'] ?? '' ) );
 
         $where  = [ '1=1' ];
@@ -496,8 +497,9 @@ class Repository {
                 FROM {$this->keyword_volumes}
                 WHERE " . implode( ' AND ', $where ) . "
                 ORDER BY updated_at DESC, id DESC
-                LIMIT %d";
+                LIMIT %d OFFSET %d";
         $params[] = $limit;
+        $params[] = $offset;
 
         return $this->wpdb->get_results(
             $this->wpdb->prepare( $sql, $params ),

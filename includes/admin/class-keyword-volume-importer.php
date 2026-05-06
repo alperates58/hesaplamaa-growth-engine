@@ -16,7 +16,7 @@ class KeywordVolumeImporter {
             wp_die( esc_html__( 'Yetkiniz yok.', 'hge' ) );
         }
 
-        $rows            = $this->repo->get_keyword_volumes( [ 'limit' => 250 ] );
+        $rows            = $this->repo->get_keyword_volumes( [ 'limit' => 5000 ] );
         $summary         = $this->repo->get_keyword_volume_summary();
         $ads_client      = new \HGE\API\GoogleAdsClient();
         $ads_configured  = $ads_client->is_configured();
