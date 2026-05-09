@@ -15,12 +15,14 @@ class IndexStatus {
     }
 
     public function get_data(){
+        $settings   = get_option( 'hge_settings', [] );
         $status_map = $this->repo->get_index_status_map();
         $rows       = [];
 
         foreach ( $this->get_public_posts() as $post ) {
             $url    = get_permalink( $post->ID );
             $status = $this->normalize_status_for_post( $status_map[ 'post:' . $post->ID ] ?? $status_map[ $url ] ?? [], $url );
+            $status['inspection_link'] = $this->get_preferred_inspection_link( $url, $status, $settings );
 
             $rows[] = array_merge(
                 [
@@ -134,7 +136,7 @@ class IndexStatus {
             'user_canonical'   => $index['userCanonical'] ?? '',
             'crawled_as'       => $index['crawledAs'] ?? '',
             'last_crawl_time'  => $index['lastCrawlTime'] ?? '',
-            'inspection_link'  => $result['inspectionResultLink'] ?? '',
+            'inspection_link'  => $this->build_inspection_link( $site_url, $url, $result['inspectionResultLink'] ?? '' ),
             'error_message'    => '',
         ] );
 
@@ -270,6 +272,32 @@ class IndexStatus {
 
         $settings['gsc_site_url'] = $site_url;
         update_option( 'hge_settings', $settings );
+    }
+
+    private function build_inspection_link( string $site_url, string $inspection_url, string $fallback_link = '' ){
+        $site_url       = trim( $site_url );
+        $inspection_url = trim( $inspection_url );
+
+        if ( $site_url === '' || $inspection_url === '' ) {
+            return $fallback_link;
+        }
+
+        return add_query_arg(
+            [
+                'resource_id' => $site_url,
+                'id'          => $inspection_url,
+            ],
+            'https://search.google.com/search-console/inspect'
+        );
+    }
+
+    private function get_preferred_inspection_link( string $inspection_url, array $status, array $settings ){
+        $configured_site_url = trim( (string) ( $settings['gsc_site_url'] ?? '' ) );
+        if ( $configured_site_url !== '' ) {
+            return $this->build_inspection_link( $configured_site_url, $inspection_url, $status['inspection_link'] ?? '' );
+        }
+
+        return $status['inspection_link'] ?? '';
     }
 
     private function normalize_status_for_post( array $status, string $current_url ){
