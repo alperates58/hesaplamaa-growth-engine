@@ -309,7 +309,7 @@ class IndexStatus {
 
         $preferred_site_url = $this->get_preferred_site_url_for_link( $inspection_url, $settings, $sites );
         if ( $preferred_site_url !== '' ) {
-            return add_query_arg( [ 'resource_id' => $preferred_site_url ], 'https://search.google.com/search-console' );
+            return add_query_arg( [ 'resource_id' => $preferred_site_url ], 'https://search.google.com/search-console/inspect' );
         }
 
         return '';
