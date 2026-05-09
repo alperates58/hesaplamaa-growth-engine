@@ -18,11 +18,16 @@ class IndexStatus {
         $settings   = get_option( 'hge_settings', [] );
         $status_map = $this->repo->get_index_status_map();
         $rows       = [];
+        $client     = new \HGE\API\GSCClient();
+        $sites      = $client->is_connected() ? $client->get_sites() : [];
+        if ( is_wp_error( $sites ) ) {
+            $sites = [];
+        }
 
         foreach ( $this->get_public_posts() as $post ) {
             $url    = get_permalink( $post->ID );
             $status = $this->normalize_status_for_post( $status_map[ 'post:' . $post->ID ] ?? $status_map[ $url ] ?? [], $url );
-            $status['inspection_link'] = $this->get_preferred_inspection_link( $url, $status, $settings );
+            $status['inspection_link'] = $this->get_preferred_inspection_link( $url, $status, $settings, $sites );
 
             $rows[] = array_merge(
                 [
@@ -266,7 +271,12 @@ class IndexStatus {
     }
 
     private function remember_working_site_url( string $site_url, array $settings ){
-        if ( empty( $site_url ) || ( $settings['gsc_site_url'] ?? '' ) === $site_url ) {
+        $current_site_url = trim( (string) ( $settings['gsc_site_url'] ?? '' ) );
+        if ( empty( $site_url ) || $current_site_url === $site_url ) {
+            return;
+        }
+
+        if ( stripos( $current_site_url, 'sc-domain:' ) === 0 && stripos( $site_url, 'sc-domain:' ) !== 0 ) {
             return;
         }
 
@@ -291,13 +301,42 @@ class IndexStatus {
         );
     }
 
-    private function get_preferred_inspection_link( string $inspection_url, array $status, array $settings ){
-        $configured_site_url = trim( (string) ( $settings['gsc_site_url'] ?? '' ) );
-        if ( $configured_site_url !== '' ) {
-            return $this->build_inspection_link( $configured_site_url, $inspection_url, $status['inspection_link'] ?? '' );
+    private function get_preferred_inspection_link( string $inspection_url, array $status, array $settings, array $sites = [] ){
+        $preferred_site_url = $this->get_preferred_site_url_for_link( $inspection_url, $settings, $sites );
+        if ( $preferred_site_url !== '' ) {
+            return $this->build_inspection_link( $preferred_site_url, $inspection_url, $status['inspection_link'] ?? '' );
         }
 
         return $status['inspection_link'] ?? '';
+    }
+
+    private function get_preferred_site_url_for_link( string $inspection_url, array $settings, array $sites ){
+        $configured_site_url = trim( (string) ( $settings['gsc_site_url'] ?? '' ) );
+        if ( stripos( $configured_site_url, 'sc-domain:' ) === 0 ) {
+            return $configured_site_url;
+        }
+
+        $matching_prefix_site = '';
+        foreach ( $sites as $site ) {
+            $site_url = trim( (string) ( $site['siteUrl'] ?? '' ) );
+            if ( ! $this->site_matches_url( $site_url, $inspection_url ) ) {
+                continue;
+            }
+
+            if ( stripos( $site_url, 'sc-domain:' ) === 0 ) {
+                return $site_url;
+            }
+
+            if ( $matching_prefix_site === '' ) {
+                $matching_prefix_site = trailingslashit( $site_url );
+            }
+        }
+
+        if ( $configured_site_url !== '' ) {
+            return $configured_site_url;
+        }
+
+        return $matching_prefix_site;
     }
 
     private function normalize_status_for_post( array $status, string $current_url ){
