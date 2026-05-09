@@ -316,11 +316,6 @@ class IndexStatus {
             return $configured_site_url;
         }
 
-        $derived_domain_property = $this->derive_domain_property_from_url( $inspection_url );
-        if ( $derived_domain_property !== '' ) {
-            return $derived_domain_property;
-        }
-
         $matching_prefix_site = '';
         foreach ( $sites as $site ) {
             $site_url = trim( (string) ( $site['siteUrl'] ?? '' ) );
@@ -337,11 +332,15 @@ class IndexStatus {
             }
         }
 
+        if ( $matching_prefix_site !== '' ) {
+            return $matching_prefix_site;
+        }
+
         if ( $configured_site_url !== '' ) {
             return $configured_site_url;
         }
 
-        return $matching_prefix_site;
+        return $this->derive_domain_property_from_url( $inspection_url );
     }
 
     private function derive_domain_property_from_url( string $inspection_url ){
