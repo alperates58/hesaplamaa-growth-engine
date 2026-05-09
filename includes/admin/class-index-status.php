@@ -316,28 +316,11 @@ class IndexStatus {
             return $configured_site_url;
         }
 
-        $matching_prefix_site = '';
         foreach ( $sites as $site ) {
             $site_url = trim( (string) ( $site['siteUrl'] ?? '' ) );
-            if ( ! $this->site_matches_url( $site_url, $inspection_url ) ) {
-                continue;
-            }
-
-            if ( stripos( $site_url, 'sc-domain:' ) === 0 ) {
+            if ( stripos( $site_url, 'sc-domain:' ) === 0 && $this->site_matches_url( $site_url, $inspection_url ) ) {
                 return $site_url;
             }
-
-            if ( $matching_prefix_site === '' ) {
-                $matching_prefix_site = trailingslashit( $site_url );
-            }
-        }
-
-        if ( $matching_prefix_site !== '' ) {
-            return $matching_prefix_site;
-        }
-
-        if ( $configured_site_url !== '' ) {
-            return $configured_site_url;
         }
 
         return $this->derive_domain_property_from_url( $inspection_url );
