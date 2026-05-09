@@ -15,19 +15,12 @@ class IndexStatus {
     }
 
     public function get_data(){
-        $settings   = get_option( 'hge_settings', [] );
         $status_map = $this->repo->get_index_status_map();
         $rows       = [];
-        $client     = new \HGE\API\GSCClient();
-        $sites      = $client->is_connected() ? $client->get_sites() : [];
-        if ( is_wp_error( $sites ) ) {
-            $sites = [];
-        }
 
         foreach ( $this->get_public_posts() as $post ) {
             $url    = get_permalink( $post->ID );
             $status = $this->normalize_status_for_post( $status_map[ 'post:' . $post->ID ] ?? $status_map[ $url ] ?? [], $url );
-            $status['inspection_link'] = $this->get_preferred_inspection_link( $url, $status, $settings, $sites );
 
             $rows[] = array_merge(
                 [
@@ -284,63 +277,6 @@ class IndexStatus {
         update_option( 'hge_settings', $settings );
     }
 
-    private function build_inspection_link( string $site_url, string $inspection_url, string $fallback_link = '' ){
-        $site_url       = trim( $site_url );
-        $inspection_url = trim( $inspection_url );
-
-        if ( $site_url === '' || $inspection_url === '' ) {
-            return $fallback_link;
-        }
-
-        return add_query_arg(
-            [
-                'resource_id' => $site_url,
-                'id'          => $inspection_url,
-            ],
-            'https://search.google.com/search-console/inspect'
-        );
-    }
-
-    private function get_preferred_inspection_link( string $inspection_url, array $status, array $settings, array $sites = [] ){
-        $stored_link = trim( $status['inspection_link'] ?? '' );
-        if ( $stored_link !== '' && ! preg_match( '/[?&]id=https?(%3A|:)/i', $stored_link ) ) {
-            return $stored_link;
-        }
-
-        $preferred_site_url = $this->get_preferred_site_url_for_link( $inspection_url, $settings, $sites );
-        if ( $preferred_site_url !== '' ) {
-            return add_query_arg( [ 'resource_id' => $preferred_site_url ], 'https://search.google.com/search-console/inspect' );
-        }
-
-        return '';
-    }
-
-    private function get_preferred_site_url_for_link( string $inspection_url, array $settings, array $sites ){
-        $configured_site_url = trim( (string) ( $settings['gsc_site_url'] ?? '' ) );
-        if ( stripos( $configured_site_url, 'sc-domain:' ) === 0 ) {
-            return $configured_site_url;
-        }
-
-        foreach ( $sites as $site ) {
-            $site_url = trim( (string) ( $site['siteUrl'] ?? '' ) );
-            if ( stripos( $site_url, 'sc-domain:' ) === 0 && $this->site_matches_url( $site_url, $inspection_url ) ) {
-                return $site_url;
-            }
-        }
-
-        return $this->derive_domain_property_from_url( $inspection_url );
-    }
-
-    private function derive_domain_property_from_url( string $inspection_url ){
-        $host = strtolower( (string) wp_parse_url( $inspection_url, PHP_URL_HOST ) );
-        $host = preg_replace( '/^www\./i', '', $host );
-
-        if ( $host === '' ) {
-            return '';
-        }
-
-        return 'sc-domain:' . $host;
-    }
 
     private function normalize_status_for_post( array $status, string $current_url ){
         if ( empty( $status ) || empty( $status['page_url'] ) || $status['page_url'] === $current_url ) {
