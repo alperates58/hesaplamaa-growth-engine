@@ -316,6 +316,11 @@ class IndexStatus {
             return $configured_site_url;
         }
 
+        $derived_domain_property = $this->derive_domain_property_from_url( $inspection_url );
+        if ( $derived_domain_property !== '' ) {
+            return $derived_domain_property;
+        }
+
         $matching_prefix_site = '';
         foreach ( $sites as $site ) {
             $site_url = trim( (string) ( $site['siteUrl'] ?? '' ) );
@@ -337,6 +342,17 @@ class IndexStatus {
         }
 
         return $matching_prefix_site;
+    }
+
+    private function derive_domain_property_from_url( string $inspection_url ){
+        $host = strtolower( (string) wp_parse_url( $inspection_url, PHP_URL_HOST ) );
+        $host = preg_replace( '/^www\./i', '', $host );
+
+        if ( $host === '' ) {
+            return '';
+        }
+
+        return 'sc-domain:' . $host;
     }
 
     private function normalize_status_for_post( array $status, string $current_url ){
