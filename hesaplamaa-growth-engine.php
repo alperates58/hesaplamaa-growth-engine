@@ -3,7 +3,7 @@
  * Plugin Name:       Hesaplamaa Growth Engine
  * Plugin URI:        https://github.com/alperates58/hesaplamaa-growth-engine
  * Description:       hesaplamaa.com için profesyonel SEO büyüme paneli. GSC entegrasyonu, keyword fırsatları ve içerik analizi.
- * Version:           1.0.0
+ * Version:           1.0.1
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Hesaplamaa
@@ -19,7 +19,7 @@ defined( 'ABSPATH' ) || exit;
 $hge_last_update_sha     = substr( (string) get_option( 'hge_last_update_sha', '' ), 0, 7 );
 $hge_last_update_version = (string) get_option( 'hge_last_update_version', '0' );
 
-define( 'HGE_VERSION',    '1.0.0-' . $hge_last_update_version . ( $hge_last_update_sha ? '-' . $hge_last_update_sha : '' ) );
+define( 'HGE_VERSION',    '1.0.1-' . $hge_last_update_version . ( $hge_last_update_sha ? '-' . $hge_last_update_sha : '' ) );
 define( 'HGE_FILE',       __FILE__ );
 define( 'HGE_DIR',        plugin_dir_path( __FILE__ ) );
 define( 'HGE_URL',        plugin_dir_url( __FILE__ ) );
