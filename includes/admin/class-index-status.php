@@ -141,7 +141,7 @@ class IndexStatus {
             'user_canonical'   => $index['userCanonical'] ?? '',
             'crawled_as'       => $index['crawledAs'] ?? '',
             'last_crawl_time'  => $index['lastCrawlTime'] ?? '',
-            'inspection_link'  => $this->build_inspection_link( $site_url, $url, $result['inspectionResultLink'] ?? '' ),
+            'inspection_link'  => $result['inspectionResultLink'] ?? '',
             'error_message'    => '',
         ] );
 
@@ -302,12 +302,17 @@ class IndexStatus {
     }
 
     private function get_preferred_inspection_link( string $inspection_url, array $status, array $settings, array $sites = [] ){
-        $preferred_site_url = $this->get_preferred_site_url_for_link( $inspection_url, $settings, $sites );
-        if ( $preferred_site_url !== '' ) {
-            return $this->build_inspection_link( $preferred_site_url, $inspection_url, $status['inspection_link'] ?? '' );
+        $stored_link = trim( $status['inspection_link'] ?? '' );
+        if ( $stored_link !== '' && ! preg_match( '/[?&]id=https?(%3A|:)/i', $stored_link ) ) {
+            return $stored_link;
         }
 
-        return $status['inspection_link'] ?? '';
+        $preferred_site_url = $this->get_preferred_site_url_for_link( $inspection_url, $settings, $sites );
+        if ( $preferred_site_url !== '' ) {
+            return add_query_arg( [ 'resource_id' => $preferred_site_url ], 'https://search.google.com/search-console' );
+        }
+
+        return '';
     }
 
     private function get_preferred_site_url_for_link( string $inspection_url, array $settings, array $sites ){
