@@ -23,6 +23,10 @@ class Scheduler {
         if ( ! wp_next_scheduled( 'hge_index_status_sync' ) ) {
             wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'hge_index_status_sync' );
         }
+
+        if ( ! wp_next_scheduled( 'hge_weekly_suggestions' ) ) {
+            wp_schedule_event( time() + ( 2 * HOUR_IN_SECONDS ), 'weekly', 'hge_weekly_suggestions' );
+        }
     }
 
     public function run_daily_sync(){
