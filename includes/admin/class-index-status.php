@@ -147,21 +147,53 @@ class IndexStatus {
         $rows       = $this->get_data();
         $checked    = [];
         $skipped    = 0;
-        $limit      = max( 1, min( 5, $limit ) );
+        $limit      = max( 1, min( 50, $limit ) );
+        $candidates = [];
 
         foreach ( $rows as $row ) {
-            if ( count( $checked ) >= $limit ) {
-                break;
-            }
-
             if ( $this->should_skip_batch_check( $row ) ) {
                 $skipped++;
                 continue;
             }
 
-            $result = $this->inspect_url( $row['page_url'], $row['page_title'], (int) $row['post_id'] );
+            $candidates[] = $row;
+        }
+
+        usort(
+            $candidates,
+            static function ( $a, $b ) {
+                $a_checked = (string) ( $a['last_checked'] ?? '' );
+                $b_checked = (string) ( $b['last_checked'] ?? '' );
+
+                if ( $a_checked === '' && $b_checked !== '' ) {
+                    return -1;
+                }
+
+                if ( $a_checked !== '' && $b_checked === '' ) {
+                    return 1;
+                }
+
+                return strcmp( $a_checked, $b_checked );
+            }
+        );
+
+        $seen = [];
+
+        foreach ( $candidates as $row ) {
+            if ( count( $checked ) >= $limit ) {
+                break;
+            }
+
+            $url = (string) ( $row['page_url'] ?? '' );
+            if ( $url === '' || isset( $seen[ $url ] ) ) {
+                continue;
+            }
+
+            $seen[ $url ] = true;
+
+            $result = $this->inspect_url( $url, $row['page_title'], (int) $row['post_id'] );
             $checked[] = [
-                'url' => $row['page_url'],
+                'url' => $url,
                 'ok'  => ! is_wp_error( $result ),
                 'msg' => is_wp_error( $result ) ? $result->get_error_message() : 'OK',
             ];
@@ -169,12 +201,14 @@ class IndexStatus {
 
         $checked_count = count( $checked );
         $elapsed_ms    = (int) round( ( microtime( true ) - $started_at ) * 1000 );
-        $message       = sprintf( __( '%1$d URL kontrol edildi, %2$d URL atlandı.', 'hge' ), $checked_count, $skipped );
+        $remaining     = max( 0, count( $candidates ) - $checked_count );
+        $message       = sprintf( __( '%1$d URL kontrol edildi, %2$d URL atlandı, %3$d URL sırada bekliyor.', 'hge' ), $checked_count, $skipped, $remaining );
 
         return [
             'checked'       => $checked,
             'checked_count' => $checked_count,
             'skipped'       => $skipped,
+            'remaining'     => $remaining,
             'elapsed_ms'    => $elapsed_ms,
             'items'         => $checked,
             'message'       => $message,

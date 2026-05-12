@@ -345,6 +345,7 @@ final class Plugin {
         wp_send_json_success( [
             'checked_count' => (int) ( $result['checked_count'] ?? count( $result['checked'] ?? [] ) ),
             'skipped'       => (int) ( $result['skipped'] ?? 0 ),
+            'remaining'     => (int) ( $result['remaining'] ?? 0 ),
             'elapsed_ms'    => (int) ( $result['elapsed_ms'] ?? 0 ),
             'items'         => $result['items'] ?? ( $result['checked'] ?? [] ),
             'message'       => $result['message'] ?? __( 'URL kontrolü tamamlandı.', 'hge' ),

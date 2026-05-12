@@ -1125,8 +1125,9 @@
                 if ( res.success ) {
                     const checkedCount = Number( res.data.checked_count || 0 );
                     const skipped = Number( res.data.skipped || 0 );
+                    const remaining = Number( res.data.remaining || 0 );
                     const elapsedSeconds = ( Number( res.data.elapsed_ms || 0 ) / 1000 ).toFixed( 1 );
-                    const resultText = `${ checkedCount } URL kontrol edildi, ${ skipped } atlandı, süre: ${ elapsedSeconds } sn`;
+                    const resultText = `${ checkedCount } URL kontrol edildi, ${ skipped } atlandı, ${ remaining } sırada, süre: ${ elapsedSeconds } sn`;
 
                     $result.text( resultText );
                     toast( res.data.message || 'URL kontrolü tamamlandı.', 'success' );
