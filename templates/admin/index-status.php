@@ -12,8 +12,10 @@
         </div>
         <div class="hge-header-right">
             <button class="hge-btn hge-btn-primary" id="hge-index-batch" data-loading-text="<?php esc_attr_e( 'Kontrol ediliyor...', 'hge' ); ?>" <?php disabled( ! $gsc_connected ); ?>>
-                <?php esc_html_e( 'Eksikleri Kontrol Et', 'hge' ); ?>
+                <?php esc_html_e( 'Sonraki 5 URL’yi Kontrol Et', 'hge' ); ?>
             </button>
+            <p class="hge-text-muted" id="hge-index-batch-help"><?php esc_html_e( 'Her tıklamada en fazla 5 URL, Google URL Inspection API ile kontrol edilir.', 'hge' ); ?></p>
+            <p class="hge-text-muted" id="hge-index-batch-result" aria-live="polite"></p>
         </div>
     </div>
 

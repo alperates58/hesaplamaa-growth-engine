@@ -1117,16 +1117,32 @@
     } );
 
     $( '#hge-index-batch' ).on( 'click', function () {
-        ajaxRequest( 'hge_inspect_index_batch', { limit: 25 }, this )
+        const $result = $( '#hge-index-batch-result' );
+        $result.text( 'Sonraki 5 URL kontrol ediliyor...' );
+
+        ajaxRequest( 'hge_inspect_index_batch', { limit: 5 }, this )
             .done( res => {
                 if ( res.success ) {
+                    const checkedCount = Number( res.data.checked_count || 0 );
+                    const skipped = Number( res.data.skipped || 0 );
+                    const elapsedSeconds = ( Number( res.data.elapsed_ms || 0 ) / 1000 ).toFixed( 1 );
+                    const resultText = `${ checkedCount } URL kontrol edildi, ${ skipped } atlandı, süre: ${ elapsedSeconds } sn`;
+
+                    $result.text( resultText );
                     toast( res.data.message || 'URL kontrolü tamamlandı.', 'success' );
-                    setTimeout( () => location.reload(), 1200 );
+                    setTimeout( () => location.reload(), 1500 );
                 } else {
+                    $result.text( res.data.message || HGE.i18n.error );
                     toast( res.data.message || HGE.i18n.error, 'error' );
                 }
             } )
-            .fail( () => toast( HGE.i18n.error, 'error' ) );
+            .fail( xhr => {
+                const msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                    ? xhr.responseJSON.data.message
+                    : HGE.i18n.error;
+                $result.text( msg );
+                toast( msg, 'error' );
+            } );
     } );
 
     // -------------------------------------------------------------------------

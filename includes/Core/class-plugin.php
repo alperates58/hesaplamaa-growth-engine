@@ -337,16 +337,17 @@ final class Plugin {
     public function ajax_inspect_index_batch(){
         $this->verify_ajax_request();
 
-        $limit   = (int) ( $_POST['limit'] ?? 25 );
+        $limit   = (int) ( $_POST['limit'] ?? 5 );
+        $limit   = max( 1, min( 5, $limit ) );
         $service = new \HGE\Admin\IndexStatus();
         $result  = $service->inspect_pending( $limit );
-        $checked = $result['checked'] ?? [];
-        $skipped = (int) ( $result['skipped'] ?? 0 );
 
         wp_send_json_success( [
-            'message' => sprintf( __( '%1$d URL kontrol edildi, %2$d URL atlandı.', 'hge' ), count( $checked ), $skipped ),
-            'items'   => $checked,
-            'skipped' => $skipped,
+            'checked_count' => (int) ( $result['checked_count'] ?? count( $result['checked'] ?? [] ) ),
+            'skipped'       => (int) ( $result['skipped'] ?? 0 ),
+            'elapsed_ms'    => (int) ( $result['elapsed_ms'] ?? 0 ),
+            'items'         => $result['items'] ?? ( $result['checked'] ?? [] ),
+            'message'       => $result['message'] ?? __( 'URL kontrolü tamamlandı.', 'hge' ),
         ] );
     }
 

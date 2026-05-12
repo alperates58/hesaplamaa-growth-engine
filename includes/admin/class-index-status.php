@@ -143,10 +143,11 @@ class IndexStatus {
     }
 
     public function inspect_pending( int $limit = 5 ){
-        $rows    = $this->get_data();
-        $checked = [];
-        $skipped = 0;
-        $limit   = max( 1, min( 50, $limit ) );
+        $started_at = microtime( true );
+        $rows       = $this->get_data();
+        $checked    = [];
+        $skipped    = 0;
+        $limit      = max( 1, min( 5, $limit ) );
 
         foreach ( $rows as $row ) {
             if ( count( $checked ) >= $limit ) {
@@ -166,9 +167,17 @@ class IndexStatus {
             ];
         }
 
+        $checked_count = count( $checked );
+        $elapsed_ms    = (int) round( ( microtime( true ) - $started_at ) * 1000 );
+        $message       = sprintf( __( '%1$d URL kontrol edildi, %2$d URL atlandı.', 'hge' ), $checked_count, $skipped );
+
         return [
-            'checked' => $checked,
-            'skipped' => $skipped,
+            'checked'       => $checked,
+            'checked_count' => $checked_count,
+            'skipped'       => $skipped,
+            'elapsed_ms'    => $elapsed_ms,
+            'items'         => $checked,
+            'message'       => $message,
         ];
     }
 
