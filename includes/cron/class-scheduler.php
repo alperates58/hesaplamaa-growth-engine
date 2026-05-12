@@ -20,13 +20,27 @@ class Scheduler {
             wp_schedule_event( time(), 'daily', 'hge_daily_sync' );
         }
 
-        if ( ! wp_next_scheduled( 'hge_index_status_sync' ) ) {
-            wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'hge_index_status_sync' );
-        }
+        $this->ensure_hourly_index_status_sync();
 
         if ( ! wp_next_scheduled( 'hge_weekly_suggestions' ) ) {
             wp_schedule_event( time() + ( 2 * HOUR_IN_SECONDS ), 'weekly', 'hge_weekly_suggestions' );
         }
+    }
+
+    private function ensure_hourly_index_status_sync(){
+        $event = wp_get_scheduled_event( 'hge_index_status_sync' );
+
+        if ( ! $event ) {
+            wp_schedule_event( time() + 300, 'hourly', 'hge_index_status_sync' );
+            return;
+        }
+
+        if ( ( $event->schedule ?? '' ) === 'hourly' ) {
+            return;
+        }
+
+        wp_clear_scheduled_hook( 'hge_index_status_sync' );
+        wp_schedule_event( time() + 300, 'hourly', 'hge_index_status_sync' );
     }
 
     public function run_daily_sync(){
@@ -235,7 +249,7 @@ class Scheduler {
         }
 
         $index_status = new \HGE\Admin\IndexStatus();
-        $result       = $index_status->inspect_pending( 25 );
+        $result       = $index_status->inspect_pending( 50 );
         $checked      = $result['checked'] ?? [];
         $skipped      = (int) ( $result['skipped'] ?? 0 );
         update_option( 'hge_last_index_status_sync', current_time( 'mysql' ) );
