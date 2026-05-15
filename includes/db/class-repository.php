@@ -743,6 +743,8 @@ class Repository {
             )
         );
 
+        $normalized_actions_json = $this->normalize_recommended_actions_json( (string) ( $row['recommended_actions_json'] ?? '[]' ) );
+
         $data = [
             'keyword'                  => sanitize_text_field( (string) $row['keyword'] ),
             'page_url'                 => esc_url_raw( (string) $row['page_url'] ),
@@ -757,7 +759,7 @@ class Repository {
             'opportunity_score'        => (int) ( $row['opportunity_score'] ?? 0 ),
             'status'                   => sanitize_text_field( (string) ( $row['status'] ?? '' ) ),
             'quality_status'           => sanitize_text_field( (string) ( $row['quality_status'] ?? '' ) ),
-            'recommended_actions_json' => wp_json_encode( json_decode( (string) ( $row['recommended_actions_json'] ?? '[]' ), true ), JSON_UNESCAPED_UNICODE ),
+            'recommended_actions_json' => $normalized_actions_json,
             'source'                   => sanitize_text_field( (string) ( $row['source'] ?? 'gsc_keyword_planner' ) ),
             'date_from'                => sanitize_text_field( (string) ( $row['date_from'] ?? '' ) ),
             'date_to'                  => sanitize_text_field( (string) ( $row['date_to'] ?? '' ) ),
@@ -767,6 +769,35 @@ class Repository {
         ];
 
         if ( $existing_id ) {
+            $existing = $this->get_seo_radar_row( (int) $existing_id );
+            if ( $existing ) {
+                $existing_impressions = (int) ( $existing['impressions'] ?? 0 );
+                $incoming_impressions = (int) $data['impressions'];
+                $existing_clicks      = (int) ( $existing['clicks'] ?? 0 );
+                $incoming_clicks      = (int) $data['clicks'];
+                $merged_impressions   = $existing_impressions + $incoming_impressions;
+                $merged_clicks        = $existing_clicks + $incoming_clicks;
+                $merged_weight        = max( 1, $existing_impressions ) + max( 1, $incoming_impressions );
+
+                $data['clicks']       = $merged_clicks;
+                $data['impressions']  = $merged_impressions;
+                $data['ctr']          = $merged_impressions > 0 ? ( $merged_clicks / $merged_impressions ) : 0;
+                $data['position']     = (
+                    ( (float) ( $existing['position'] ?? 0 ) * max( 1, $existing_impressions ) ) +
+                    ( (float) $data['position'] * max( 1, $incoming_impressions ) )
+                ) / $merged_weight;
+                $data['search_volume'] = max( (int) ( $existing['search_volume'] ?? 0 ), (int) $data['search_volume'] );
+                $data['post_id']       = (int) $data['post_id'] > 0 ? (int) $data['post_id'] : (int) ( $existing['post_id'] ?? 0 );
+                $data['quality_status'] = $this->merge_quality_status(
+                    (string) ( $existing['quality_status'] ?? '' ),
+                    (string) $data['quality_status']
+                );
+                $data['recommended_actions_json'] = $this->merge_recommended_actions_json(
+                    (string) ( $existing['recommended_actions_json'] ?? '[]' ),
+                    $normalized_actions_json
+                );
+            }
+
             return (bool) $this->wpdb->update( $this->seo_opportunities, $data, [ 'id' => $existing_id ] );
         }
 
@@ -800,7 +831,8 @@ class Repository {
             return null;
         }
 
-        $row['recommended_actions'] = json_decode( (string) ( $row['recommended_actions_json'] ?? '[]' ), true );
+        $row['recommended_actions'] = $this->decode_recommended_actions( (string) ( $row['recommended_actions_json'] ?? '[]' ) );
+        $row['url_type']            = $this->decode_url_type( (string) ( $row['recommended_actions_json'] ?? '[]' ) );
         return $row;
     }
 
@@ -833,7 +865,7 @@ class Repository {
                 $where[] = 'post_id > 0';
                 break;
             case 'quality':
-                $where[] = "quality_status <> 'Sağlıklı' AND quality_status <> 'Kontrol bekliyor' AND quality_status <> ''";
+                $where[] = "quality_status NOT IN ('Sağlıklı', 'Kontrol bekliyor', 'Kategori arşivi', 'Kategori URL', 'Arşiv URL') AND quality_status <> ''";
                 break;
         }
 
@@ -876,7 +908,7 @@ class Repository {
         }
 
         if ( ! empty( $filters['quality_only'] ) ) {
-            $where[] = "quality_status <> 'Sağlıklı' AND quality_status <> 'Kontrol bekliyor' AND quality_status <> ''";
+            $where[] = "quality_status NOT IN ('Sağlıklı', 'Kontrol bekliyor', 'Kategori arşivi', 'Kategori URL', 'Arşiv URL') AND quality_status <> ''";
         }
 
         $where_sql = implode( ' AND ', $where );
@@ -899,7 +931,8 @@ class Repository {
         ) ?: [];
 
         foreach ( $rows as &$row ) {
-            $row['recommended_actions'] = json_decode( (string) ( $row['recommended_actions_json'] ?? '[]' ), true ) ?: [];
+            $row['recommended_actions'] = $this->decode_recommended_actions( (string) ( $row['recommended_actions_json'] ?? '[]' ) );
+            $row['url_type']            = $this->decode_url_type( (string) ( $row['recommended_actions_json'] ?? '[]' ) );
         }
         unset( $row );
 
@@ -925,7 +958,7 @@ class Repository {
                     COUNT(*) AS total,
                     SUM(CASE WHEN status IN ('Acil Büyüt', 'Hızlı Kazanım') THEN 1 ELSE 0 END) AS quick_wins,
                     SUM(CASE WHEN position BETWEEN 4 AND 10 THEN 1 ELSE 0 END) AS near_top10,
-                    SUM(CASE WHEN quality_status <> 'Sağlıklı' AND quality_status <> 'Kontrol bekliyor' AND quality_status <> '' THEN 1 ELSE 0 END) AS quality_issues
+                    SUM(CASE WHEN quality_status NOT IN ('Sağlıklı', 'Kontrol bekliyor', 'Kategori arşivi', 'Kategori URL', 'Arşiv URL') AND quality_status <> '' THEN 1 ELSE 0 END) AS quality_issues
                  FROM {$this->seo_opportunities}
                  WHERE date_from = %s AND date_to = %s",
                 $date_from,
@@ -960,6 +993,105 @@ class Repository {
         }
 
         return strtolower( $keyword );
+    }
+
+    private function normalize_recommended_actions_json( string $json ){
+        $payload = json_decode( $json, true );
+        if ( ! is_array( $payload ) ) {
+            $payload = [];
+        }
+
+        $actions = [];
+        foreach ( (array) ( $payload['actions'] ?? [] ) as $action ) {
+            $action = sanitize_text_field( (string) $action );
+            if ( $action !== '' ) {
+                $actions[] = $action;
+            }
+        }
+
+        $payload = [
+            'actions'  => array_values( array_unique( $actions ) ),
+            'url_type' => sanitize_key( (string) ( $payload['url_type'] ?? 'unknown' ) ),
+        ];
+
+        $encoded = wp_json_encode( $payload, JSON_UNESCAPED_UNICODE );
+        return $encoded ? $encoded : '{"actions":[],"url_type":"unknown"}';
+    }
+
+    private function decode_recommended_actions( string $json ){
+        $payload = json_decode( $json, true );
+        if ( ! is_array( $payload ) ) {
+            return [];
+        }
+
+        $actions = [];
+        foreach ( (array) ( $payload['actions'] ?? [] ) as $action ) {
+            $action = sanitize_text_field( (string) $action );
+            if ( $action !== '' ) {
+                $actions[] = $action;
+            }
+        }
+
+        return array_values( array_unique( $actions ) );
+    }
+
+    private function decode_url_type( string $json ){
+        $payload = json_decode( $json, true );
+        if ( ! is_array( $payload ) ) {
+            return 'unknown';
+        }
+
+        $url_type = sanitize_key( (string) ( $payload['url_type'] ?? 'unknown' ) );
+        return $url_type !== '' ? $url_type : 'unknown';
+    }
+
+    private function merge_recommended_actions_json( string $existing_json, string $incoming_json ){
+        $actions = array_merge(
+            $this->decode_recommended_actions( $existing_json ),
+            $this->decode_recommended_actions( $incoming_json )
+        );
+
+        $url_type = $this->decode_url_type( $incoming_json );
+        if ( $url_type === 'unknown' ) {
+            $url_type = $this->decode_url_type( $existing_json );
+        }
+
+        $encoded = wp_json_encode(
+            [
+                'actions'  => array_values( array_unique( array_filter( array_map( 'sanitize_text_field', $actions ) ) ) ),
+                'url_type' => $url_type,
+            ],
+            JSON_UNESCAPED_UNICODE
+        );
+
+        return $encoded ? $encoded : '{"actions":[],"url_type":"unknown"}';
+    }
+
+    private function merge_quality_status( string $existing_status, string $incoming_status ){
+        $existing_status = sanitize_text_field( $existing_status );
+        $incoming_status = sanitize_text_field( $incoming_status );
+
+        if ( $incoming_status === '' ) {
+            return $existing_status;
+        }
+
+        if ( $existing_status === '' ) {
+            return $incoming_status;
+        }
+
+        $priority = [
+            'Kategori arşivi'  => 1,
+            'Kategori URL'     => 1,
+            'Arşiv URL'        => 1,
+            'Kontrol bekliyor' => 2,
+            'Kontrol gerekli'  => 3,
+            'Sağlıklı'         => 4,
+        ];
+
+        $existing_weight = $priority[ $existing_status ] ?? 100;
+        $incoming_weight = $priority[ $incoming_status ] ?? 100;
+
+        return $existing_weight <= $incoming_weight ? $existing_status : $incoming_status;
     }
 
     // -------------------------------------------------------------------------
