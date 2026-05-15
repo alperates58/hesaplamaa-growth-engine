@@ -898,6 +898,7 @@ class Repository {
         }
 
         $where_sql = implode( ' AND ', $where );
+        $order_sql = $this->build_seo_radar_order_by_sql( $filters );
         $total     = (int) $this->wpdb->get_var(
             $this->wpdb->prepare(
                 "SELECT COUNT(*) FROM {$this->seo_opportunities} WHERE {$where_sql}",
@@ -909,7 +910,7 @@ class Repository {
             $this->wpdb->prepare(
                 "SELECT * FROM {$this->seo_opportunities}
                  WHERE {$where_sql}
-                 ORDER BY opportunity_score DESC, impressions DESC, id DESC
+                 ORDER BY {$order_sql}
                  LIMIT %d OFFSET %d",
                 array_merge( $params, [ $limit, $offset ] )
             ),
@@ -1056,6 +1057,27 @@ class Repository {
             'where'  => $where,
             'params' => $params,
         ];
+    }
+
+    private function build_seo_radar_order_by_sql( array $filters ){
+        $sort  = sanitize_key( (string) ( $filters['sort'] ?? 'opportunity' ) );
+        $order = 'asc' === strtolower( (string) ( $filters['order'] ?? 'desc' ) ) ? 'ASC' : 'DESC';
+
+        $map = [
+            'keyword'     => "keyword {$order}, id DESC",
+            'url'         => "page_url {$order}, id DESC",
+            'clicks'      => "clicks {$order}, impressions DESC, id DESC",
+            'impressions' => "impressions {$order}, opportunity_score DESC, id DESC",
+            'ctr'         => "ctr {$order}, impressions DESC, id DESC",
+            'position'    => "position {$order}, opportunity_score DESC, id DESC",
+            'volume'      => "search_volume {$order}, opportunity_score DESC, id DESC",
+            'competition' => "FIELD(UPPER(competition), 'LOW', 'MEDIUM', 'HIGH', 'UNKNOWN') {$order}, opportunity_score DESC, id DESC",
+            'opportunity' => "opportunity_score {$order}, impressions DESC, id DESC",
+            'status'      => "status {$order}, opportunity_score DESC, id DESC",
+            'quality'     => "quality_status {$order}, opportunity_score DESC, id DESC",
+        ];
+
+        return $map[ $sort ] ?? $map['opportunity'];
     }
 
     private function mysql_datetime_or_null( string $value ){

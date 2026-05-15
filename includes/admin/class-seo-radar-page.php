@@ -48,6 +48,8 @@ class SEORadarPage {
             'days'                  => absint( $_GET['hge_days'] ?? 28 ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended
             'paged'                 => absint( $_GET['paged'] ?? 1 ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended
             'limit'                 => absint( $_GET['hge_limit'] ?? 50 ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            'sort'                  => sanitize_text_field( wp_unslash( $_GET['hge_sort'] ?? 'opportunity' ) ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            'order'                 => sanitize_text_field( wp_unslash( $_GET['hge_order'] ?? 'desc' ) ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended
             'position_band'         => sanitize_text_field( wp_unslash( $_GET['hge_position_band'] ?? '' ) ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended
             'volume_band'           => sanitize_text_field( wp_unslash( $_GET['hge_volume_band'] ?? '' ) ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended
             'ctr_band'              => sanitize_text_field( wp_unslash( $_GET['hge_ctr_band'] ?? '' ) ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -69,6 +71,8 @@ class SEORadarPage {
             'hge_search'           => $filters['search'],
             'hge_days'             => $filters['days'],
             'hge_limit'            => $filters['limit'],
+            'hge_sort'             => $filters['sort'],
+            'hge_order'            => $filters['order'],
             'hge_position_band'    => $filters['position_band'],
             'hge_volume_band'      => $filters['volume_band'],
             'hge_ctr_band'         => $filters['ctr_band'],

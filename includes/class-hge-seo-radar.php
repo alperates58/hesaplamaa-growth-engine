@@ -41,6 +41,8 @@ class SEORadar {
             'offset'                => ( $page - 1 ) * $limit,
             'paged'                 => $page,
             'view'                  => sanitize_key( (string) ( $filters['view'] ?? 'all' ) ),
+            'sort'                  => sanitize_key( (string) ( $filters['sort'] ?? 'opportunity' ) ),
+            'order'                 => 'asc' === strtolower( sanitize_text_field( (string) ( $filters['order'] ?? 'desc' ) ) ) ? 'asc' : 'desc',
             'position_band'         => sanitize_text_field( (string) ( $filters['position_band'] ?? '' ) ),
             'volume_band'           => sanitize_text_field( (string) ( $filters['volume_band'] ?? '' ) ),
             'ctr_band'              => sanitize_text_field( (string) ( $filters['ctr_band'] ?? '' ) ),

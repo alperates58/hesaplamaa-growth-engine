@@ -11,6 +11,8 @@ $current_args = [
     'hge_search'           => $filters['search'] ?? '',
     'hge_days'             => (int) ( $filters['days'] ?? 28 ),
     'hge_limit'            => (int) ( $filters['limit'] ?? 50 ),
+    'hge_sort'             => $filters['sort'] ?? 'opportunity',
+    'hge_order'            => $filters['order'] ?? 'desc',
     'hge_position_band'    => $filters['position_band'] ?? '',
     'hge_volume_band'      => $filters['volume_band'] ?? '',
     'hge_ctr_band'         => $filters['ctr_band'] ?? '',
@@ -28,7 +30,7 @@ $current_args = [
 $clean_args = array_filter(
     $current_args,
     static function ( $value, $key ) {
-        if ( 'page' === $key || 'hge_days' === $key || 'hge_limit' === $key || 'hge_radar_view' === $key ) {
+        if ( 'page' === $key || 'hge_days' === $key || 'hge_limit' === $key || 'hge_radar_view' === $key || 'hge_sort' === $key || 'hge_order' === $key ) {
             return true;
         }
 
@@ -114,6 +116,8 @@ $all_results_url   = $reset_url ?? add_query_arg(
     $base_url
 );
 $clear_url         = $all_results_url;
+$current_sort      = sanitize_key( (string) ( $filters['sort'] ?? 'opportunity' ) );
+$current_order     = 'asc' === strtolower( (string) ( $filters['order'] ?? 'desc' ) ) ? 'asc' : 'desc';
 
 $build_page_url = static function ( int $page_number ) use ( $base_url, $clean_args ) {
     return add_query_arg(
@@ -211,6 +215,36 @@ $quality_class = static function ( string $quality ) {
     }
 
     return 'is-danger';
+};
+
+$build_sort_url = static function ( string $sort_key ) use ( $base_url, $clean_args, $current_sort, $current_order ) {
+    $next_order = ( $current_sort === $sort_key && 'asc' === $current_order ) ? 'desc' : 'asc';
+
+    return add_query_arg(
+        array_merge(
+            $clean_args,
+            [
+                'hge_sort'  => $sort_key,
+                'hge_order' => $next_order,
+                'paged'     => 1,
+            ]
+        ),
+        $base_url
+    );
+};
+
+$render_sort_header = static function ( string $label, string $sort_key ) use ( $build_sort_url, $current_sort, $current_order ) {
+    $is_active = $current_sort === $sort_key;
+    $arrow     = $is_active ? ( 'asc' === $current_order ? '↑' : '↓' ) : '↕';
+    $class     = $is_active ? ' is-active' : '';
+
+    return sprintf(
+        '<a class="hge-radar-sort-link%1$s" href="%2$s"><span>%3$s</span><span class="hge-radar-sort-link__icon" aria-hidden="true">%4$s</span></a>',
+        esc_attr( $class ),
+        esc_url( $build_sort_url( $sort_key ) ),
+        esc_html( $label ),
+        esc_html( $arrow )
+    );
 };
 ?>
 <div class="hge-wrap hge-seo-radar-page">
@@ -383,13 +417,13 @@ $quality_class = static function ( string $quality ) {
                     </colgroup>
                     <thead>
                         <tr>
-                            <th><?php esc_html_e( 'Anahtar Kelime', 'hge' ); ?></th>
-                            <th><?php esc_html_e( 'URL', 'hge' ); ?></th>
-                            <th><?php esc_html_e( 'Metrikler', 'hge' ); ?></th>
-                            <th><?php esc_html_e( 'Pozisyon', 'hge' ); ?></th>
-                            <th><?php esc_html_e( 'Hacim / Rekabet', 'hge' ); ?></th>
-                            <th><?php esc_html_e( 'Fırsat', 'hge' ); ?></th>
-                            <th><?php esc_html_e( 'Durum / Kalite', 'hge' ); ?></th>
+                            <th><?php echo wp_kses_post( $render_sort_header( __( 'Anahtar Kelime', 'hge' ), 'keyword' ) ); ?></th>
+                            <th><?php echo wp_kses_post( $render_sort_header( __( 'URL', 'hge' ), 'url' ) ); ?></th>
+                            <th><?php echo wp_kses_post( $render_sort_header( __( 'Metrikler', 'hge' ), 'impressions' ) ); ?></th>
+                            <th><?php echo wp_kses_post( $render_sort_header( __( 'Pozisyon', 'hge' ), 'position' ) ); ?></th>
+                            <th><?php echo wp_kses_post( $render_sort_header( __( 'Hacim / Rekabet', 'hge' ), 'volume' ) ); ?></th>
+                            <th><?php echo wp_kses_post( $render_sort_header( __( 'Fırsat', 'hge' ), 'opportunity' ) ); ?></th>
+                            <th><?php echo wp_kses_post( $render_sort_header( __( 'Durum / Kalite', 'hge' ), 'status' ) ); ?></th>
                             <th><?php esc_html_e( 'Aksiyonlar', 'hge' ); ?></th>
                         </tr>
                     </thead>
