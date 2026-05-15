@@ -1244,6 +1244,44 @@
                 } );
         } );
 
+        $( document ).on( 'click', '.hge-radar-ai-apply', function () {
+            const $btn = $( this );
+            const $row = $( '.hge-radar-row.is-selected' ).first();
+            const rowId = Number( $row.data( 'radar-id' ) || 0 );
+            const $status = $( '#hge-radar-ai-apply-status' );
+
+            if ( rowId <= 0 ) {
+                $status.text( 'Uygulamak için bir satır seçin.' );
+                toast( 'Uygulamak için bir satır seçin.', 'error' );
+                return;
+            }
+
+            $status.text( 'AI önerisi uygulanıyor...' );
+
+            ajaxRequest( 'hge_seo_radar_ai_apply', {
+                row_id: rowId,
+            }, this )
+                .done( res => {
+                    if ( ! res.success ) {
+                        const msg = res.data && res.data.message ? res.data.message : HGE.i18n.error;
+                        $status.text( msg );
+                        toast( msg, 'error' );
+                        return;
+                    }
+
+                    const data = res.data || {};
+                    $status.text( data.message || 'AI önerisi uygulandı.' );
+                    toast( data.message || 'AI önerisi uygulandı.', 'success' );
+                } )
+                .fail( xhr => {
+                    const msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                        ? xhr.responseJSON.data.message
+                        : HGE.i18n.error;
+                    $status.text( msg );
+                    toast( msg, 'error' );
+                } );
+        } );
+
         $( document ).on( 'click', '.hge-radar-csv-toggle', function () {
             const $btn = $( this );
             const active = $btn.hasClass( 'is-selected-for-csv' );

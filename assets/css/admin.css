@@ -3121,6 +3121,19 @@ input[type="submit"].hge-btn { height: auto; padding: 10px 24px; }
     text-decoration: none;
 }
 
+.hge-seo-radar-page .hge-radar-ai-apply-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
+.hge-seo-radar-page .hge-radar-ai-apply-status {
+    color: var(--hge-radar-muted);
+    font-size: 12px;
+}
+
 .hge-seo-radar-page #hge-radar-detail-actions,
 .hge-seo-radar-page #hge-radar-quality-signals,
 .hge-seo-radar-page #hge-radar-ai-faqs,

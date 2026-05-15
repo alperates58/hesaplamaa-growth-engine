@@ -268,6 +268,84 @@ class SEORadar {
         ];
     }
 
+    public function apply_ai_suggestion( int $row_id ){
+        $row = $this->repo->get_seo_radar_row( $row_id );
+        if ( empty( $row ) ) {
+            return new \WP_Error( 'hge_radar_row_missing', __( 'Radar satırı bulunamadı.', 'hge' ) );
+        }
+
+        $post_id = (int) ( $row['post_id'] ?? 0 );
+        if ( $post_id <= 0 ) {
+            return new \WP_Error( 'hge_radar_post_missing', __( 'Bu radar satırı için eşleşen içerik yok.', 'hge' ) );
+        }
+
+        $post = get_post( $post_id );
+        if ( ! $post || ! in_array( $post->post_type, [ 'post', 'page' ], true ) ) {
+            return new \WP_Error( 'hge_radar_invalid_post', __( 'Uygulanabilir bir yazı veya sayfa bulunamadı.', 'hge' ) );
+        }
+
+        $suggestion = $this->generate_ai_suggestion( $row_id );
+        if ( is_wp_error( $suggestion ) ) {
+            return $suggestion;
+        }
+
+        $insight          = (array) ( $suggestion['insight'] ?? [] );
+        $new_title        = $this->normalize_ai_title( (string) ( $insight['radar_title'] ?? '' ), (string) $post->post_title );
+        $meta_description = $this->normalize_ai_meta_description( (string) ( $insight['meta_description'] ?? '' ) );
+        $intro            = $this->normalize_ai_intro( (string) ( $insight['intro_suggestion'] ?? ( $insight['rationale'] ?? '' ) ) );
+        $new_content      = $this->apply_intro_to_content( (string) $post->post_content, $intro );
+
+        $updated = wp_update_post(
+            [
+                'ID'           => $post_id,
+                'post_title'   => $new_title,
+                'post_content' => $new_content,
+            ],
+            true
+        );
+
+        if ( is_wp_error( $updated ) ) {
+            return $updated;
+        }
+
+        if ( '' !== $new_title ) {
+            update_post_meta( $post_id, '_yoast_wpseo_title', sanitize_text_field( $new_title ) );
+            update_post_meta( $post_id, 'rank_math_title', sanitize_text_field( $new_title ) );
+        }
+
+        if ( '' !== $meta_description ) {
+            update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_textarea_field( $meta_description ) );
+            update_post_meta( $post_id, 'rank_math_description', sanitize_textarea_field( $meta_description ) );
+        }
+
+        if ( ! empty( $row['keyword'] ) ) {
+            $keyword = sanitize_text_field( (string) $row['keyword'] );
+            update_post_meta( $post_id, '_yoast_wpseo_focuskw', $keyword );
+            update_post_meta( $post_id, 'rank_math_focus_keyword', $keyword );
+        }
+
+        update_post_meta(
+            $post_id,
+            '_hge_radar_last_ai_apply',
+            wp_json_encode(
+                [
+                    'row_id'     => $row_id,
+                    'keyword'    => (string) ( $row['keyword'] ?? '' ),
+                    'applied_at' => current_time( 'mysql' ),
+                ],
+                JSON_UNESCAPED_UNICODE
+            )
+        );
+
+        return [
+            'post_id'          => $post_id,
+            'post_title'       => $new_title,
+            'meta_description' => $meta_description,
+            'intro_applied'    => '' !== $intro,
+            'message'          => __( 'AI önerisi içeriğe uygulandı.', 'hge' ),
+        ];
+    }
+
     public function stream_csv( array $filters ){
         $filters          = $this->normalize_filters( $filters );
         $filters['limit'] = 5000;
@@ -743,5 +821,52 @@ class SEORadar {
         }
 
         return false;
+    }
+
+    private function normalize_ai_title( string $title, string $fallback ){
+        $title = sanitize_text_field( trim( $title ) );
+        return '' !== $title ? $title : sanitize_text_field( $fallback );
+    }
+
+    private function normalize_ai_meta_description( string $meta ){
+        $meta = sanitize_textarea_field( trim( $meta ) );
+        if ( '' === $meta ) {
+            return '';
+        }
+
+        if ( function_exists( 'mb_substr' ) ) {
+            return mb_substr( $meta, 0, 160, 'UTF-8' );
+        }
+
+        return substr( $meta, 0, 160 );
+    }
+
+    private function normalize_ai_intro( string $intro ){
+        $intro = trim( wp_strip_all_tags( $intro ) );
+        $intro = preg_replace( '/\s+/u', ' ', $intro );
+        return is_string( $intro ) ? trim( $intro ) : '';
+    }
+
+    private function apply_intro_to_content( string $content, string $intro ){
+        if ( '' === $intro ) {
+            return $content;
+        }
+
+        $content = trim( $content );
+        if ( '' === $content ) {
+            return $intro;
+        }
+
+        if ( preg_match( '/<p\b[^>]*>.*?<\/p>/is', $content ) ) {
+            return (string) preg_replace( '/<p\b[^>]*>.*?<\/p>/is', '<p>' . esc_html( $intro ) . '</p>', $content, 1 );
+        }
+
+        $parts = preg_split( "/\r\n\r\n|\n\n|\r\r/", $content, 2 );
+        if ( is_array( $parts ) && isset( $parts[0] ) ) {
+            $tail = isset( $parts[1] ) ? "\n\n" . $parts[1] : '';
+            return $intro . $tail;
+        }
+
+        return $intro . "\n\n" . $content;
     }
 }

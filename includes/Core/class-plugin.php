@@ -59,6 +59,7 @@ final class Plugin {
         add_action( 'wp_ajax_hge_seo_radar_refresh', [ $this, 'ajax_seo_radar_refresh' ] );
         add_action( 'wp_ajax_hge_seo_radar_quality_check', [ $this, 'ajax_seo_radar_quality_check' ] );
         add_action( 'wp_ajax_hge_seo_radar_ai_suggest', [ $this, 'ajax_seo_radar_ai_suggest' ] );
+        add_action( 'wp_ajax_hge_seo_radar_ai_apply', [ $this, 'ajax_seo_radar_ai_apply' ] );
         add_action( 'wp_ajax_hge_seo_radar_export_csv', [ $this, 'ajax_seo_radar_export_csv' ] );
 
         add_action( 'transition_post_status', [ $this, 'queue_post_for_index_check' ], 10, 3 );
@@ -391,6 +392,24 @@ final class Plugin {
 
         $radar  = new \HGE\SEORadar();
         $result = $radar->generate_ai_suggestion( $row_id );
+
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( [ 'message' => $result->get_error_message() ], 500 );
+        }
+
+        wp_send_json_success( $result );
+    }
+
+    public function ajax_seo_radar_ai_apply(){
+        $this->verify_ajax_request();
+
+        $row_id = (int) ( $_POST['row_id'] ?? 0 );
+        if ( $row_id <= 0 ) {
+            wp_send_json_error( [ 'message' => __( 'Radar satırı eksik.', 'hge' ) ], 400 );
+        }
+
+        $radar  = new \HGE\SEORadar();
+        $result = $radar->apply_ai_suggestion( $row_id );
 
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( [ 'message' => $result->get_error_message() ], 500 );

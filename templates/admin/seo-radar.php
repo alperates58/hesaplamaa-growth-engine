@@ -582,6 +582,10 @@ $render_sort_header = static function ( string $label, string $sort_key ) use ( 
                         <p id="hge-radar-ai-meta">-</p>
                         <span><?php esc_html_e( 'İlk Paragraf Önerisi', 'hge' ); ?></span>
                         <p id="hge-radar-ai-intro">-</p>
+                        <div class="hge-radar-ai-apply-row">
+                            <button class="hge-btn hge-btn-primary hge-radar-ai-apply" type="button" data-loading-text="<?php esc_attr_e( 'Uygulanıyor...', 'hge' ); ?>"><?php esc_html_e( 'Öneriyi Uygula', 'hge' ); ?></button>
+                            <span id="hge-radar-ai-apply-status" class="hge-radar-ai-apply-status"></span>
+                        </div>
                     </div>
                     <div class="hge-radar-detail-grid">
                         <div>
