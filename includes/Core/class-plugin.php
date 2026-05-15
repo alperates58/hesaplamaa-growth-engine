@@ -410,12 +410,17 @@ final class Plugin {
 
         $radar = new \HGE\SEORadar();
         $radar->stream_csv( [
-            'view'                  => sanitize_text_field( wp_unslash( $_REQUEST['hge_radar_view'] ?? 'quick-wins' ) ),
+            'view'                  => sanitize_text_field( wp_unslash( $_REQUEST['hge_radar_view'] ?? 'all' ) ),
             'search'                => sanitize_text_field( wp_unslash( $_REQUEST['hge_search'] ?? '' ) ),
             'days'                  => (int) ( $_REQUEST['hge_days'] ?? 28 ),
             'limit'                 => (int) ( $_REQUEST['hge_limit'] ?? 50 ),
             'paged'                 => 1,
             'position_band'         => sanitize_text_field( wp_unslash( $_REQUEST['hge_position_band'] ?? '' ) ),
+            'volume_band'           => sanitize_text_field( wp_unslash( $_REQUEST['hge_volume_band'] ?? '' ) ),
+            'ctr_band'              => sanitize_text_field( wp_unslash( $_REQUEST['hge_ctr_band'] ?? '' ) ),
+            'competition'           => sanitize_text_field( wp_unslash( $_REQUEST['hge_competition'] ?? '' ) ),
+            'url_type'              => sanitize_text_field( wp_unslash( $_REQUEST['hge_url_type'] ?? '' ) ),
+            'quality_band'          => sanitize_text_field( wp_unslash( $_REQUEST['hge_quality_band'] ?? '' ) ),
             'low_ctr_only'          => ! empty( $_REQUEST['hge_low_ctr'] ),
             'high_impressions_only' => ! empty( $_REQUEST['hge_high_impressions'] ),
             'high_volume_only'      => ! empty( $_REQUEST['hge_high_volume'] ),

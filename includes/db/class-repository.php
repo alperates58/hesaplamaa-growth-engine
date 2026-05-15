@@ -837,25 +837,11 @@ class Repository {
     }
 
     public function get_seo_radar_rows( array $filters ){
-        $limit  = max( 10, min( 100, (int) ( $filters['limit'] ?? 50 ) ) );
+        $limit  = max( 10, min( 250, (int) ( $filters['limit'] ?? 50 ) ) );
         $offset = max( 0, (int) ( $filters['offset'] ?? 0 ) );
-        $where  = [ '1=1' ];
-        $params = [];
-
-        if ( ! empty( $filters['search'] ) ) {
-            $where[]  = '(keyword LIKE %s OR page_url LIKE %s)';
-            $needle   = '%' . $this->wpdb->esc_like( sanitize_text_field( (string) $filters['search'] ) ) . '%';
-            $params[] = $needle;
-            $params[] = $needle;
-        }
-
-        if ( ! empty( $filters['days'] ) ) {
-            $date_to   = gmdate( 'Y-m-d' );
-            $date_from = gmdate( 'Y-m-d', strtotime( '-' . max( 1, (int) $filters['days'] - 1 ) . ' days' ) );
-            $where[]   = 'date_from = %s AND date_to = %s';
-            $params[]  = $date_from;
-            $params[]  = $date_to;
-        }
+        $query  = $this->build_seo_radar_query_parts( $filters );
+        $where  = $query['where'];
+        $params = $query['params'];
 
         switch ( (string) ( $filters['view'] ?? '' ) ) {
             case 'quick-wins':
@@ -972,6 +958,103 @@ class Repository {
             'quick_wins'     => (int) ( $row['quick_wins'] ?? 0 ),
             'near_top10'     => (int) ( $row['near_top10'] ?? 0 ),
             'quality_issues' => (int) ( $row['quality_issues'] ?? 0 ),
+        ];
+    }
+
+    private function build_seo_radar_query_parts( array $filters ){
+        $where  = [ '1=1' ];
+        $params = [];
+
+        if ( ! empty( $filters['search'] ) ) {
+            $where[]  = '(keyword LIKE %s OR page_url LIKE %s)';
+            $needle   = '%' . $this->wpdb->esc_like( sanitize_text_field( (string) $filters['search'] ) ) . '%';
+            $params[] = $needle;
+            $params[] = $needle;
+        }
+
+        if ( ! empty( $filters['days'] ) ) {
+            $date_to   = gmdate( 'Y-m-d' );
+            $date_from = gmdate( 'Y-m-d', strtotime( '-' . max( 1, (int) $filters['days'] - 1 ) . ' days' ) );
+            $where[]   = 'date_from = %s AND date_to = %s';
+            $params[]  = $date_from;
+            $params[]  = $date_to;
+        }
+
+        switch ( (string) ( $filters['view'] ?? '' ) ) {
+            case 'near-top10':
+                $where[] = 'position >= 4 AND position <= 10';
+                break;
+            case 'keywords':
+                $where[] = "recommended_actions_json NOT LIKE '%\"url_type\":\"category\"%' AND recommended_actions_json NOT LIKE '%\"url_type\":\"tag\"%' AND recommended_actions_json NOT LIKE '%\"url_type\":\"author\"%' AND recommended_actions_json NOT LIKE '%\"url_type\":\"archive\"%'";
+                break;
+            case 'categories':
+                $where[] = "recommended_actions_json LIKE '%\"url_type\":\"category\"%'";
+                break;
+        }
+
+        switch ( (string) ( $filters['volume_band'] ?? '' ) ) {
+            case '1000+':
+                $where[] = 'search_volume >= 1000';
+                break;
+            case '2500+':
+                $where[] = 'search_volume >= 2500';
+                break;
+            case '5000+':
+                $where[] = 'search_volume >= 5000';
+                break;
+        }
+
+        switch ( (string) ( $filters['ctr_band'] ?? '' ) ) {
+            case 'lt1':
+                $where[] = 'ctr < 0.01';
+                break;
+            case 'lt3':
+                $where[] = 'ctr < 0.03';
+                break;
+            case 'gte3':
+                $where[] = 'ctr >= 0.03';
+                break;
+        }
+
+        $competition = strtoupper( sanitize_text_field( (string) ( $filters['competition'] ?? '' ) ) );
+        if ( in_array( $competition, [ 'LOW', 'MEDIUM', 'HIGH', 'UNKNOWN' ], true ) ) {
+            $where[]  = 'UPPER(competition) = %s';
+            $params[] = $competition;
+        }
+
+        switch ( (string) ( $filters['url_type'] ?? '' ) ) {
+            case 'content':
+                $where[] = "recommended_actions_json NOT LIKE '%\"url_type\":\"category\"%' AND recommended_actions_json NOT LIKE '%\"url_type\":\"tag\"%' AND recommended_actions_json NOT LIKE '%\"url_type\":\"author\"%' AND recommended_actions_json NOT LIKE '%\"url_type\":\"archive\"%'";
+                break;
+            case 'category':
+                $where[] = "recommended_actions_json LIKE '%\"url_type\":\"category\"%'";
+                break;
+            case 'archive':
+                $where[] = "(recommended_actions_json LIKE '%\"url_type\":\"tag\"%' OR recommended_actions_json LIKE '%\"url_type\":\"author\"%' OR recommended_actions_json LIKE '%\"url_type\":\"archive\"%')";
+                break;
+            case 'unknown':
+                $where[] = "recommended_actions_json LIKE '%\"url_type\":\"unknown\"%'";
+                break;
+        }
+
+        switch ( (string) ( $filters['quality_band'] ?? '' ) ) {
+            case 'issues':
+                $where[] = "quality_status NOT IN ('Sağlıklı', 'Kontrol bekliyor', 'Kategori arşivi', 'Kategori URL', 'Arşiv URL') AND quality_status <> ''";
+                break;
+            case 'healthy':
+                $where[] = "quality_status = 'Sağlıklı'";
+                break;
+            case 'pending':
+                $where[] = "quality_status IN ('Kontrol bekliyor', 'Kontrol gerekli')";
+                break;
+            case 'category':
+                $where[] = "quality_status IN ('Kategori arşivi', 'Kategori URL', 'Arşiv URL')";
+                break;
+        }
+
+        return [
+            'where'  => $where,
+            'params' => $params,
         ];
     }
 

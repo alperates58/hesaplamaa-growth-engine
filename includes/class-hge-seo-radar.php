@@ -33,15 +33,20 @@ class SEORadar {
         $days         = (int) ( $filters['days'] ?? self::DEFAULT_DAYS );
         $days         = in_array( $days, $allowed_days, true ) ? $days : self::DEFAULT_DAYS;
         $page         = max( 1, (int) ( $filters['paged'] ?? 1 ) );
-        $limit        = max( 10, min( 100, (int) ( $filters['limit'] ?? self::DEFAULT_LIMIT ) ) );
+        $limit        = max( 10, min( 250, (int) ( $filters['limit'] ?? self::DEFAULT_LIMIT ) ) );
 
         return [
             'days'                  => $days,
             'limit'                 => $limit,
             'offset'                => ( $page - 1 ) * $limit,
             'paged'                 => $page,
-            'view'                  => sanitize_key( (string) ( $filters['view'] ?? 'quick-wins' ) ),
+            'view'                  => sanitize_key( (string) ( $filters['view'] ?? 'all' ) ),
             'position_band'         => sanitize_text_field( (string) ( $filters['position_band'] ?? '' ) ),
+            'volume_band'           => sanitize_text_field( (string) ( $filters['volume_band'] ?? '' ) ),
+            'ctr_band'              => sanitize_text_field( (string) ( $filters['ctr_band'] ?? '' ) ),
+            'competition'           => sanitize_text_field( strtoupper( (string) ( $filters['competition'] ?? '' ) ) ),
+            'url_type'              => sanitize_key( (string) ( $filters['url_type'] ?? '' ) ),
+            'quality_band'          => sanitize_key( (string) ( $filters['quality_band'] ?? '' ) ),
             'low_ctr_only'          => ! empty( $filters['low_ctr_only'] ) ? 1 : 0,
             'high_impressions_only' => ! empty( $filters['high_impressions_only'] ) ? 1 : 0,
             'high_volume_only'      => ! empty( $filters['high_volume_only'] ) ? 1 : 0,
