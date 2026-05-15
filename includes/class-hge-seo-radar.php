@@ -290,10 +290,23 @@ class SEORadar {
         }
 
         $insight          = (array) ( $suggestion['insight'] ?? [] );
-        $new_title        = $this->normalize_ai_title( (string) ( $insight['radar_title'] ?? '' ), (string) $post->post_title );
+        $new_title        = $this->normalize_ai_title(
+            (string) ( $insight['radar_title'] ?? '' ),
+            (string) $post->post_title,
+            (string) ( $row['keyword'] ?? '' )
+        );
         $meta_description = $this->normalize_ai_meta_description( (string) ( $insight['meta_description'] ?? '' ) );
         $intro            = $this->normalize_ai_intro( (string) ( $insight['intro_suggestion'] ?? ( $insight['rationale'] ?? '' ) ) );
         $new_content      = $this->apply_intro_to_content( (string) $post->post_content, $intro );
+        $links_added      = 0;
+
+        if ( $this->count_internal_links_in_content( $new_content ) < 1 ) {
+            $related_links = $this->find_related_internal_links( $post_id, 4 );
+            if ( ! empty( $related_links ) ) {
+                $new_content = $this->append_internal_links_block( $new_content, $related_links );
+                $links_added = count( $related_links );
+            }
+        }
 
         $updated = wp_update_post(
             [
@@ -342,6 +355,7 @@ class SEORadar {
             'post_title'       => $new_title,
             'meta_description' => $meta_description,
             'intro_applied'    => '' !== $intro,
+            'links_added'      => $links_added,
             'message'          => __( 'AI önerisi içeriğe uygulandı.', 'hge' ),
         ];
     }
@@ -823,9 +837,42 @@ class SEORadar {
         return false;
     }
 
-    private function normalize_ai_title( string $title, string $fallback ){
-        $title = sanitize_text_field( trim( $title ) );
-        return '' !== $title ? $title : sanitize_text_field( $fallback );
+    private function normalize_ai_title( string $title, string $fallback, string $keyword = '' ){
+        $fallback = sanitize_text_field( $fallback );
+        $title    = sanitize_text_field( trim( $title ) );
+        $keyword  = sanitize_text_field( trim( $keyword ) );
+
+        if ( '' === $title ) {
+            return $fallback;
+        }
+
+        $normalized_title   = function_exists( 'mb_strtolower' ) ? mb_strtolower( $title, 'UTF-8' ) : strtolower( $title );
+        $normalized_keyword = function_exists( 'mb_strtolower' ) ? mb_strtolower( $keyword, 'UTF-8' ) : strtolower( $keyword );
+
+        foreach ( [
+            'seo iyileştirme',
+            'seo iyilestirme',
+            'önerileri',
+            'onerileri',
+            'sayfası için',
+            'sayfasi icin',
+            'için seo',
+            'icin seo',
+        ] as $bad_phrase ) {
+            if ( strpos( $normalized_title, $bad_phrase ) !== false ) {
+                return $fallback;
+            }
+        }
+
+        if ( $normalized_keyword !== '' && strpos( $normalized_title, $normalized_keyword ) === false ) {
+            return $fallback;
+        }
+
+        if ( function_exists( 'mb_strlen' ) && mb_strlen( $title, 'UTF-8' ) < 12 ) {
+            return $fallback;
+        }
+
+        return rtrim( $title, " \t\n\r\0\x0B-|" );
     }
 
     private function normalize_ai_meta_description( string $meta ){
@@ -868,5 +915,139 @@ class SEORadar {
         }
 
         return $intro . "\n\n" . $content;
+    }
+
+    private function count_internal_links_in_content( string $content ){
+        $site_url = preg_quote( untrailingslashit( get_site_url() ), '/' );
+
+        preg_match_all( '/<a[^>]+href=["\'](' . $site_url . '[^"\']*)["\'][^>]*>/i', $content, $matches );
+
+        return count( $matches[1] ?? [] );
+    }
+
+    private function find_related_internal_links( int $post_id, int $limit = 4 ){
+        $limit = max( 1, min( 5, $limit ) );
+        $terms = get_the_terms( $post_id, 'category' );
+
+        if ( empty( $terms ) || is_wp_error( $terms ) ) {
+            return [];
+        }
+
+        $term_ids         = [];
+        $deepest_term_id  = 0;
+        $deepest_term_len = -1;
+
+        foreach ( $terms as $term ) {
+            if ( ! $term instanceof \WP_Term ) {
+                continue;
+            }
+
+            $term_ids[] = (int) $term->term_id;
+            $depth      = count( get_ancestors( (int) $term->term_id, 'category', 'taxonomy' ) );
+
+            if ( (int) $term->parent > 0 && $depth > $deepest_term_len ) {
+                $deepest_term_len = $depth;
+                $deepest_term_id  = (int) $term->term_id;
+            }
+        }
+
+        $links = [];
+        if ( $deepest_term_id > 0 ) {
+            $links = $this->collect_related_links_by_categories( $post_id, [ $deepest_term_id ], $limit );
+        }
+
+        if ( count( $links ) < $limit && ! empty( $term_ids ) ) {
+            $exclude_ids = array_column( $links, 'post_id' );
+            $links       = array_merge(
+                $links,
+                $this->collect_related_links_by_categories(
+                    $post_id,
+                    array_values( array_unique( $term_ids ) ),
+                    $limit - count( $links ),
+                    $exclude_ids
+                )
+            );
+        }
+
+        return array_slice( $links, 0, $limit );
+    }
+
+    private function collect_related_links_by_categories( int $post_id, array $category_ids, int $limit, array $exclude_ids = [] ){
+        $category_ids = array_values( array_filter( array_map( 'intval', $category_ids ) ) );
+        $exclude_ids  = array_values( array_unique( array_filter( array_map( 'intval', array_merge( [ $post_id ], $exclude_ids ) ) ) ) );
+
+        if ( empty( $category_ids ) || $limit <= 0 ) {
+            return [];
+        }
+
+        $candidate_ids = get_posts(
+            [
+                'post_type'              => [ 'post', 'page' ],
+                'post_status'            => 'publish',
+                'posts_per_page'         => max( 8, $limit * 3 ),
+                'post__not_in'           => $exclude_ids,
+                'category__in'           => $category_ids,
+                'orderby'                => 'modified',
+                'order'                  => 'DESC',
+                'fields'                 => 'ids',
+                'no_found_rows'          => true,
+                'ignore_sticky_posts'    => true,
+                'update_post_meta_cache' => false,
+                'update_post_term_cache' => false,
+            ]
+        );
+
+        if ( empty( $candidate_ids ) ) {
+            return [];
+        }
+
+        $links = [];
+        foreach ( $candidate_ids as $candidate_id ) {
+            $candidate_id = (int) $candidate_id;
+            $url          = get_permalink( $candidate_id );
+            $title        = get_the_title( $candidate_id );
+
+            if ( $candidate_id <= 0 || ! $url || '' === trim( (string) $title ) ) {
+                continue;
+            }
+
+            $links[] = [
+                'post_id' => $candidate_id,
+                'title'   => wp_strip_all_tags( $title ),
+                'url'     => $url,
+            ];
+
+            if ( count( $links ) >= $limit ) {
+                break;
+            }
+        }
+
+        return $links;
+    }
+
+    private function append_internal_links_block( string $content, array $links ){
+        if ( empty( $links ) ) {
+            return $content;
+        }
+
+        $items = [];
+        foreach ( $links as $link ) {
+            $url   = isset( $link['url'] ) ? esc_url( (string) $link['url'] ) : '';
+            $title = isset( $link['title'] ) ? esc_html( (string) $link['title'] ) : '';
+
+            if ( '' === $url || '' === $title ) {
+                continue;
+            }
+
+            $items[] = '<li><a href="' . $url . '">' . $title . '</a></li>';
+        }
+
+        if ( empty( $items ) ) {
+            return $content;
+        }
+
+        $block = "\n\n<h2>" . esc_html__( 'İlgili Hesaplamalar', 'hge' ) . "</h2>\n<ul>\n" . implode( "\n", $items ) . "\n</ul>";
+
+        return rtrim( $content ) . $block;
     }
 }
