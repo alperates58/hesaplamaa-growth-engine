@@ -18,6 +18,7 @@ class Repository {
     public string $ai_insights;
     public string $index_status;
     public string $keyword_volumes;
+    public string $seo_opportunities;
 
     public function __construct() {
         global $wpdb;
@@ -29,6 +30,7 @@ class Repository {
         $this->ai_insights = $wpdb->prefix . 'hge_ai_insights';
         $this->index_status = $wpdb->prefix . 'hge_index_status';
         $this->keyword_volumes = $wpdb->prefix . 'hge_keyword_volumes';
+        $this->seo_opportunities = $wpdb->prefix . 'hge_seo_opportunities';
     }
 
     // -------------------------------------------------------------------------
@@ -155,6 +157,20 @@ class Repository {
 
     public function get_keyword_count(){
         return (int) $this->wpdb->get_var( "SELECT COUNT(*) FROM {$this->keywords}" );
+    }
+
+    public function get_keyword_batch( int $limit = 250, int $offset = 0 ){
+        return $this->wpdb->get_results(
+            $this->wpdb->prepare(
+                "SELECT id, keyword, page_url, impressions, clicks, ctr, avg_position
+                 FROM {$this->keywords}
+                 ORDER BY id ASC
+                 LIMIT %d OFFSET %d",
+                max( 1, $limit ),
+                max( 0, $offset )
+            ),
+            ARRAY_A
+        ) ?: [];
     }
 
     public function get_top_rising( int $limit = 10 ){
@@ -673,6 +689,257 @@ class Repository {
             }
         }
         return $map;
+    }
+
+    public function get_keyword_volume_data_map( array $keywords ){
+        $keywords = array_values( array_filter( array_map( [ $this, 'normalize_keyword' ], $keywords ) ) );
+        if ( empty( $keywords ) ) {
+            return [];
+        }
+
+        $hashes       = array_map( 'md5', array_unique( $keywords ) );
+        $placeholders = implode( ',', array_fill( 0, count( $hashes ), '%s' ) );
+        $rows         = $this->wpdb->get_results(
+            $this->wpdb->prepare(
+                "SELECT keyword, keyword_hash, monthly_volume, competition
+                 FROM {$this->keyword_volumes}
+                 WHERE keyword_hash IN ($placeholders)",
+                $hashes
+            ),
+            ARRAY_A
+        ) ?: [];
+
+        $map = [];
+        foreach ( $rows as $row ) {
+            $map[ $this->normalize_keyword( (string) $row['keyword'] ) ] = [
+                'monthly_volume' => (int) ( $row['monthly_volume'] ?? 0 ),
+                'competition'    => sanitize_text_field( (string) ( $row['competition'] ?? 'UNKNOWN' ) ),
+            ];
+        }
+
+        return $map;
+    }
+
+    public function clear_seo_opportunities_window( string $date_from, string $date_to ){
+        return (bool) $this->wpdb->query(
+            $this->wpdb->prepare(
+                "DELETE FROM {$this->seo_opportunities} WHERE date_from = %s AND date_to = %s",
+                $date_from,
+                $date_to
+            )
+        );
+    }
+
+    public function save_seo_opportunity( array $row ){
+        $existing_id = $this->wpdb->get_var(
+            $this->wpdb->prepare(
+                "SELECT id FROM {$this->seo_opportunities}
+                 WHERE keyword = %s AND page_url = %s AND date_from = %s AND date_to = %s
+                 LIMIT 1",
+                sanitize_text_field( (string) $row['keyword'] ),
+                esc_url_raw( (string) $row['page_url'] ),
+                sanitize_text_field( (string) $row['date_from'] ),
+                sanitize_text_field( (string) $row['date_to'] )
+            )
+        );
+
+        $data = [
+            'keyword'                  => sanitize_text_field( (string) $row['keyword'] ),
+            'page_url'                 => esc_url_raw( (string) $row['page_url'] ),
+            'post_id'                  => (int) ( $row['post_id'] ?? 0 ),
+            'clicks'                   => (int) ( $row['clicks'] ?? 0 ),
+            'impressions'              => (int) ( $row['impressions'] ?? 0 ),
+            'ctr'                      => (float) ( $row['ctr'] ?? 0 ),
+            'position'                 => (float) ( $row['position'] ?? 0 ),
+            'search_volume'            => (int) ( $row['search_volume'] ?? 0 ),
+            'competition'              => sanitize_text_field( (string) ( $row['competition'] ?? '' ) ),
+            'intent_score'             => (int) ( $row['intent_score'] ?? 0 ),
+            'opportunity_score'        => (int) ( $row['opportunity_score'] ?? 0 ),
+            'status'                   => sanitize_text_field( (string) ( $row['status'] ?? '' ) ),
+            'quality_status'           => sanitize_text_field( (string) ( $row['quality_status'] ?? '' ) ),
+            'recommended_actions_json' => wp_json_encode( json_decode( (string) ( $row['recommended_actions_json'] ?? '[]' ), true ), JSON_UNESCAPED_UNICODE ),
+            'source'                   => sanitize_text_field( (string) ( $row['source'] ?? 'gsc_keyword_planner' ) ),
+            'date_from'                => sanitize_text_field( (string) ( $row['date_from'] ?? '' ) ),
+            'date_to'                  => sanitize_text_field( (string) ( $row['date_to'] ?? '' ) ),
+            'last_checked_at'          => $this->mysql_datetime_or_null( (string) ( $row['last_checked_at'] ?? '' ) ),
+            'created_at'               => $this->mysql_datetime_or_null( (string) ( $row['created_at'] ?? current_time( 'mysql' ) ) ),
+            'updated_at'               => current_time( 'mysql' ),
+        ];
+
+        if ( $existing_id ) {
+            return (bool) $this->wpdb->update( $this->seo_opportunities, $data, [ 'id' => $existing_id ] );
+        }
+
+        return (bool) $this->wpdb->insert( $this->seo_opportunities, $data );
+    }
+
+    public function update_seo_opportunity_quality( int $id, string $quality_status, string $status, int $score ){
+        return (bool) $this->wpdb->update(
+            $this->seo_opportunities,
+            [
+                'quality_status'    => sanitize_text_field( $quality_status ),
+                'status'            => sanitize_text_field( $status ),
+                'opportunity_score' => max( 0, min( 100, $score ) ),
+                'last_checked_at'   => current_time( 'mysql' ),
+                'updated_at'        => current_time( 'mysql' ),
+            ],
+            [ 'id' => $id ]
+        );
+    }
+
+    public function get_seo_radar_row( int $id ){
+        $row = $this->wpdb->get_row(
+            $this->wpdb->prepare(
+                "SELECT * FROM {$this->seo_opportunities} WHERE id = %d LIMIT 1",
+                $id
+            ),
+            ARRAY_A
+        );
+
+        if ( empty( $row ) ) {
+            return null;
+        }
+
+        $row['recommended_actions'] = json_decode( (string) ( $row['recommended_actions_json'] ?? '[]' ), true );
+        return $row;
+    }
+
+    public function get_seo_radar_rows( array $filters ){
+        $limit  = max( 10, min( 100, (int) ( $filters['limit'] ?? 50 ) ) );
+        $offset = max( 0, (int) ( $filters['offset'] ?? 0 ) );
+        $where  = [ '1=1' ];
+        $params = [];
+
+        if ( ! empty( $filters['search'] ) ) {
+            $where[]  = '(keyword LIKE %s OR page_url LIKE %s)';
+            $needle   = '%' . $this->wpdb->esc_like( sanitize_text_field( (string) $filters['search'] ) ) . '%';
+            $params[] = $needle;
+            $params[] = $needle;
+        }
+
+        if ( ! empty( $filters['days'] ) ) {
+            $date_to   = gmdate( 'Y-m-d' );
+            $date_from = gmdate( 'Y-m-d', strtotime( '-' . max( 1, (int) $filters['days'] - 1 ) . ' days' ) );
+            $where[]   = 'date_from = %s AND date_to = %s';
+            $params[]  = $date_from;
+            $params[]  = $date_to;
+        }
+
+        switch ( (string) ( $filters['view'] ?? '' ) ) {
+            case 'quick-wins':
+                $where[] = "status IN ('Acil Büyüt', 'Hızlı Kazanım')";
+                break;
+            case 'pages':
+                $where[] = 'post_id > 0';
+                break;
+            case 'quality':
+                $where[] = "quality_status <> 'Sağlıklı' AND quality_status <> 'Kontrol bekliyor' AND quality_status <> ''";
+                break;
+        }
+
+        switch ( (string) ( $filters['position_band'] ?? '' ) ) {
+            case '1-3':
+                $where[] = 'position >= 1 AND position <= 3';
+                break;
+            case '4-10':
+                $where[] = 'position >= 4 AND position <= 10';
+                break;
+            case '11-20':
+                $where[] = 'position >= 11 AND position <= 20';
+                break;
+            case '21-50':
+                $where[] = 'position >= 21 AND position <= 50';
+                break;
+            case '50+':
+                $where[] = 'position > 50';
+                break;
+        }
+
+        if ( ! empty( $filters['low_ctr_only'] ) ) {
+            $where[] = 'ctr <= 0.03';
+        }
+
+        if ( ! empty( $filters['high_impressions_only'] ) ) {
+            $where[] = 'impressions >= 500';
+        }
+
+        if ( ! empty( $filters['high_volume_only'] ) ) {
+            $where[] = 'search_volume >= 1000';
+        }
+
+        if ( ! empty( $filters['low_competition_only'] ) ) {
+            $where[] = "competition IN ('LOW', 'MEDIUM')";
+        }
+
+        if ( ! empty( $filters['intent_only'] ) ) {
+            $where[] = 'intent_score > 0';
+        }
+
+        if ( ! empty( $filters['quality_only'] ) ) {
+            $where[] = "quality_status <> 'Sağlıklı' AND quality_status <> 'Kontrol bekliyor' AND quality_status <> ''";
+        }
+
+        $where_sql = implode( ' AND ', $where );
+        $total     = (int) $this->wpdb->get_var(
+            $this->wpdb->prepare(
+                "SELECT COUNT(*) FROM {$this->seo_opportunities} WHERE {$where_sql}",
+                $params
+            )
+        );
+
+        $rows = $this->wpdb->get_results(
+            $this->wpdb->prepare(
+                "SELECT * FROM {$this->seo_opportunities}
+                 WHERE {$where_sql}
+                 ORDER BY opportunity_score DESC, impressions DESC, id DESC
+                 LIMIT %d OFFSET %d",
+                array_merge( $params, [ $limit, $offset ] )
+            ),
+            ARRAY_A
+        ) ?: [];
+
+        foreach ( $rows as &$row ) {
+            $row['recommended_actions'] = json_decode( (string) ( $row['recommended_actions_json'] ?? '[]' ), true ) ?: [];
+        }
+        unset( $row );
+
+        return [
+            'items'      => $rows,
+            'pagination' => [
+                'total' => $total,
+                'pages' => max( 1, (int) ceil( $total / $limit ) ),
+                'paged' => max( 1, (int) ( $filters['paged'] ?? 1 ) ),
+                'limit' => $limit,
+            ],
+        ];
+    }
+
+    public function get_seo_radar_summary( array $filters ){
+        $days      = ! empty( $filters['days'] ) ? (int) $filters['days'] : 28;
+        $date_to   = gmdate( 'Y-m-d' );
+        $date_from = gmdate( 'Y-m-d', strtotime( '-' . max( 1, $days - 1 ) . ' days' ) );
+
+        $row = $this->wpdb->get_row(
+            $this->wpdb->prepare(
+                "SELECT
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN status IN ('Acil Büyüt', 'Hızlı Kazanım') THEN 1 ELSE 0 END) AS quick_wins,
+                    SUM(CASE WHEN position BETWEEN 4 AND 10 THEN 1 ELSE 0 END) AS near_top10,
+                    SUM(CASE WHEN quality_status <> 'Sağlıklı' AND quality_status <> 'Kontrol bekliyor' AND quality_status <> '' THEN 1 ELSE 0 END) AS quality_issues
+                 FROM {$this->seo_opportunities}
+                 WHERE date_from = %s AND date_to = %s",
+                $date_from,
+                $date_to
+            ),
+            ARRAY_A
+        ) ?: [];
+
+        return [
+            'total'          => (int) ( $row['total'] ?? 0 ),
+            'quick_wins'     => (int) ( $row['quick_wins'] ?? 0 ),
+            'near_top10'     => (int) ( $row['near_top10'] ?? 0 ),
+            'quality_issues' => (int) ( $row['quality_issues'] ?? 0 ),
+        ];
     }
 
     private function mysql_datetime_or_null( string $value ){

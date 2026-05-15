@@ -56,6 +56,10 @@ final class Plugin {
         add_action( 'wp_ajax_hge_refresh_archive_volumes', [ $this, 'ajax_refresh_archive_volumes' ] );
         add_action( 'wp_ajax_hge_inspect_index_status', [ $this, 'ajax_inspect_index_status' ] );
         add_action( 'wp_ajax_hge_inspect_index_batch',  [ $this, 'ajax_inspect_index_batch' ] );
+        add_action( 'wp_ajax_hge_seo_radar_refresh', [ $this, 'ajax_seo_radar_refresh' ] );
+        add_action( 'wp_ajax_hge_seo_radar_quality_check', [ $this, 'ajax_seo_radar_quality_check' ] );
+        add_action( 'wp_ajax_hge_seo_radar_ai_suggest', [ $this, 'ajax_seo_radar_ai_suggest' ] );
+        add_action( 'wp_ajax_hge_seo_radar_export_csv', [ $this, 'ajax_seo_radar_export_csv' ] );
 
         add_action( 'transition_post_status', [ $this, 'queue_post_for_index_check' ], 10, 3 );
         add_action( 'save_post', [ $this, 'queue_saved_post_for_index_check' ], 10, 3 );
@@ -349,6 +353,75 @@ final class Plugin {
             'elapsed_ms'    => (int) ( $result['elapsed_ms'] ?? 0 ),
             'items'         => $result['items'] ?? ( $result['checked'] ?? [] ),
             'message'       => $result['message'] ?? __( 'URL kontrolü tamamlandı.', 'hge' ),
+        ] );
+    }
+
+    public function ajax_seo_radar_refresh(){
+        $this->verify_ajax_request();
+
+        $radar  = new \HGE\SEORadar();
+        $result = $radar->refresh_opportunities( [
+            'days'       => (int) ( $_POST['days'] ?? 28 ),
+            'batch_size' => 250,
+        ] );
+
+        wp_send_json_success( $result );
+    }
+
+    public function ajax_seo_radar_quality_check(){
+        $this->verify_ajax_request();
+
+        $radar  = new \HGE\SEORadar();
+        $result = $radar->run_quality_check(
+            (int) ( $_POST['post_id'] ?? 0 ),
+            esc_url_raw( wp_unslash( $_POST['page_url'] ?? '' ) ),
+            (int) ( $_POST['row_id'] ?? 0 )
+        );
+
+        wp_send_json_success( $result );
+    }
+
+    public function ajax_seo_radar_ai_suggest(){
+        $this->verify_ajax_request();
+
+        $row_id = (int) ( $_POST['row_id'] ?? 0 );
+        if ( $row_id <= 0 ) {
+            wp_send_json_error( [ 'message' => __( 'Radar satÄ±rÄ± eksik.', 'hge' ) ], 400 );
+        }
+
+        $radar  = new \HGE\SEORadar();
+        $result = $radar->generate_ai_suggestion( $row_id );
+
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( [ 'message' => $result->get_error_message() ], 500 );
+        }
+
+        wp_send_json_success( $result );
+    }
+
+    public function ajax_seo_radar_export_csv(){
+        if ( ! check_ajax_referer( 'hge_nonce', 'nonce', false ) ) {
+            wp_die( esc_html__( 'GÃ¼venlik doÄŸrulamasÄ± baÅŸarÄ±sÄ±z.', 'hge' ) );
+        }
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Yetkiniz yok.', 'hge' ) );
+        }
+
+        $radar = new \HGE\SEORadar();
+        $radar->stream_csv( [
+            'view'                  => sanitize_text_field( wp_unslash( $_REQUEST['hge_radar_view'] ?? 'quick-wins' ) ),
+            'search'                => sanitize_text_field( wp_unslash( $_REQUEST['hge_search'] ?? '' ) ),
+            'days'                  => (int) ( $_REQUEST['hge_days'] ?? 28 ),
+            'limit'                 => (int) ( $_REQUEST['hge_limit'] ?? 50 ),
+            'paged'                 => 1,
+            'position_band'         => sanitize_text_field( wp_unslash( $_REQUEST['hge_position_band'] ?? '' ) ),
+            'low_ctr_only'          => ! empty( $_REQUEST['hge_low_ctr'] ),
+            'high_impressions_only' => ! empty( $_REQUEST['hge_high_impressions'] ),
+            'high_volume_only'      => ! empty( $_REQUEST['hge_high_volume'] ),
+            'low_competition_only'  => ! empty( $_REQUEST['hge_low_competition'] ),
+            'intent_only'           => ! empty( $_REQUEST['hge_intent'] ),
+            'quality_only'          => ! empty( $_REQUEST['hge_quality'] ),
         ] );
     }
 

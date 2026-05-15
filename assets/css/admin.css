@@ -2491,3 +2491,108 @@ input[type="submit"].hge-btn { height: auto; padding: 10px 24px; }
         flex-direction: column;
     }
 }
+
+.hge-seo-radar-page .hge-kpi-grid {
+    margin-bottom: 18px;
+}
+
+.hge-radar-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.hge-radar-tab {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 8px 12px;
+    border: 1px solid var(--hge-border);
+    border-radius: 999px;
+    background: var(--hge-surface);
+    color: var(--hge-text-muted);
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.hge-radar-tab.is-active {
+    border-color: var(--hge-blue);
+    background: var(--hge-blue-dim);
+    color: var(--hge-blue);
+}
+
+.hge-radar-filter-grid {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(140px, .8fr));
+    gap: 10px;
+}
+
+.hge-radar-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    margin-top: 14px;
+    color: var(--hge-text-muted);
+    font-size: 12px;
+}
+
+.hge-radar-checks label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.hge-radar-actions {
+    display: grid;
+    gap: 6px;
+}
+
+.hge-radar-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.hge-radar-pagination-links {
+    display: flex;
+    gap: 8px;
+}
+
+.hge-radar-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.hge-radar-detail-grid h4 {
+    margin: 0 0 8px;
+}
+
+.hge-radar-detail-grid ul,
+#hge-radar-quality-signals {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.hge-radar-csv-toggle.is-selected-for-csv {
+    border-color: var(--hge-green);
+    background: var(--hge-green-dim);
+    color: var(--hge-green);
+}
+
+@media (max-width: 960px) {
+    .hge-radar-filter-grid,
+    .hge-radar-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hge-radar-pagination {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

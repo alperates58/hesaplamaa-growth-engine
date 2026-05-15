@@ -1147,6 +1147,112 @@
     } );
 
     // -------------------------------------------------------------------------
+    // SEO Radar
+    // -------------------------------------------------------------------------
+    function initSEORadar() {
+        if ( ! document.querySelector( '.hge-seo-radar-page' ) ) return;
+
+        $( '#hge-seo-radar-refresh' ).on( 'click', function () {
+            const days = Number( $( 'select[name="hge_days"]' ).val() || 28 );
+            ajaxRequest( 'hge_seo_radar_refresh', { days }, this )
+                .done( res => {
+                    if ( res.success ) {
+                        toast( res.data.message || 'SEO Radar verileri hesaplandı.', 'success' );
+                        setTimeout( () => location.reload(), 1200 );
+                    } else {
+                        toast( res.data.message || HGE.i18n.error, 'error' );
+                    }
+                } )
+                .fail( xhr => {
+                    const msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                        ? xhr.responseJSON.data.message
+                        : HGE.i18n.error;
+                    toast( msg, 'error' );
+                } );
+        } );
+
+        $( document ).on( 'click', '.hge-radar-quality-check', function () {
+            const $row = $( this ).closest( '.hge-radar-row' );
+            ajaxRequest( 'hge_seo_radar_quality_check', {
+                row_id: Number( $row.data( 'radar-id' ) || 0 ),
+                post_id: Number( $row.data( 'post-id' ) || 0 ),
+                page_url: $row.data( 'page-url' ) || '',
+            }, this )
+                .done( res => {
+                    if ( ! res.success ) {
+                        toast( res.data.message || HGE.i18n.error, 'error' );
+                        return;
+                    }
+
+                    const data = res.data || {};
+                    $( '#hge-seo-radar-detail-empty' ).prop( 'hidden', true );
+                    $( '#hge-seo-radar-quality-result' ).prop( 'hidden', false );
+                    $( '#hge-radar-quality-summary' ).text( data.quality_status || '-' );
+
+                    const $signals = $( '#hge-radar-quality-signals' ).empty();
+                    ( data.signals || [] ).forEach( signal => {
+                        $( '<li />' ).text( `${ signal.label }: ${ signal.ok ? 'OK' : 'Sorun' }` ).appendTo( $signals );
+                    } );
+                    $row.find( '.hge-radar-quality-text' ).text( data.quality_status || '-' );
+                    toast( 'Kalite kontrolü tamamlandı.', 'success' );
+                } )
+                .fail( xhr => {
+                    const msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                        ? xhr.responseJSON.data.message
+                        : HGE.i18n.error;
+                    toast( msg, 'error' );
+                } );
+        } );
+
+        $( document ).on( 'click', '.hge-radar-ai-suggest', function () {
+            const $row = $( this ).closest( '.hge-radar-row' );
+            ajaxRequest( 'hge_seo_radar_ai_suggest', {
+                row_id: Number( $row.data( 'radar-id' ) || 0 ),
+            }, this )
+                .done( res => {
+                    if ( ! res.success ) {
+                        toast( res.data.message || HGE.i18n.error, 'error' );
+                        return;
+                    }
+
+                    const insight = res.data.insight || {};
+                    $( '#hge-seo-radar-detail-empty' ).prop( 'hidden', true );
+                    $( '#hge-seo-radar-ai-result' ).prop( 'hidden', false );
+                    $( '#hge-radar-ai-title' ).text( insight.radar_title || '-' );
+                    $( '#hge-radar-ai-meta' ).text( insight.meta_description || '-' );
+                    $( '#hge-radar-ai-intro' ).text( insight.intro_suggestion || insight.rationale || '-' );
+
+                    const $faqs = $( '#hge-radar-ai-faqs' ).empty();
+                    ( insight.faq_items || [] ).forEach( item => $( '<li />' ).text( item ).appendTo( $faqs ) );
+                    if ( ! $faqs.children().length ) {
+                        $( '<li />' ).text( 'SSS önerisi üretilemedi.' ).appendTo( $faqs );
+                    }
+
+                    const $anchors = $( '#hge-radar-ai-anchors' ).empty();
+                    ( insight.anchor_suggestions || [] ).forEach( item => $( '<li />' ).text( item ).appendTo( $anchors ) );
+                    if ( ! $anchors.children().length ) {
+                        $( '<li />' ).text( 'Anchor önerisi üretilemedi.' ).appendTo( $anchors );
+                    }
+
+                    toast( res.data.cached ? 'Kayıtlı AI önerisi gösteriliyor.' : 'AI önerisi hazır.', 'success' );
+                } )
+                .fail( xhr => {
+                    const msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                        ? xhr.responseJSON.data.message
+                        : HGE.i18n.error;
+                    toast( msg, 'error' );
+                } );
+        } );
+
+        $( document ).on( 'click', '.hge-radar-csv-toggle', function () {
+            const $btn = $( this );
+            const active = $btn.hasClass( 'is-selected-for-csv' );
+            $btn.toggleClass( 'is-selected-for-csv', ! active );
+            $btn.text( active ? 'CSV’ye Dahil' : 'CSV’de Seçili' );
+        } );
+    }
+
+    // -------------------------------------------------------------------------
     // Tablo Sıralama (basit)
     // -------------------------------------------------------------------------
     $( document ).on( 'click', '.hge-table-sortable thead th[data-sort]', function () {
@@ -1212,6 +1318,7 @@
         initDashboardCharts();
         applyIdeaFilters();
         initIdeasWorkspace();
+        initSEORadar();
     } );
 
 } )( jQuery );

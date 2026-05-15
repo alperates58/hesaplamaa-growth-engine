@@ -35,6 +35,8 @@ function hge_load_files() {
         // DB (önce — diğerleri kullanıyor)
         'includes/db/class-migrator.php',
         'includes/db/class-repository.php',
+        'includes/class-hge-opportunity-score.php',
+        'includes/class-hge-seo-radar.php',
         // API
         'includes/api/class-gsc-client.php',
         'includes/api/class-suggest-client.php',
@@ -53,6 +55,7 @@ function hge_load_files() {
         'includes/admin/class-ai-settings.php',
         'includes/admin/class-github-settings.php',
         'includes/admin/class-system-status.php',
+        'includes/admin/class-seo-radar-page.php',
         // Cron
         'includes/cron/class-scheduler.php',
         'includes/Core/class-github-updater.php',

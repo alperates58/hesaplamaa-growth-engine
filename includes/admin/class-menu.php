@@ -4,7 +4,7 @@ namespace HGE\Admin;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * WordPress admin menüsünü kaydet
+ * WordPress admin menusunu kaydet
  */
 class Menu {
 
@@ -13,7 +13,6 @@ class Menu {
     }
 
     public function add_menus(){
-        // Ana menü
         add_menu_page(
             __( 'Hesaplamaa Growth Engine', 'hge' ),
             __( 'HGE', 'hge' ),
@@ -24,7 +23,6 @@ class Menu {
             30
         );
 
-        // Alt menüler
         $submenus = [
             [
                 'parent' => 'hge-dashboard',
@@ -39,6 +37,13 @@ class Menu {
                 'menu'   => __( 'Keyword Fırsatları', 'hge' ),
                 'slug'   => 'hge-opportunities',
                 'cb'     => [ $this, 'render_opportunities' ],
+            ],
+            [
+                'parent' => 'hge-dashboard',
+                'title'  => __( 'SEO Radar', 'hge' ),
+                'menu'   => __( 'SEO Radar', 'hge' ),
+                'slug'   => 'hge-seo-radar',
+                'cb'     => [ $this, 'render_seo_radar' ],
             ],
             [
                 'parent' => 'hge-dashboard',
@@ -125,6 +130,10 @@ class Menu {
         ( new KeywordOpportunities() )->render();
     }
 
+    public function render_seo_radar(){
+        ( new SEORadarPage() )->render();
+    }
+
     public function render_keyword_volume_importer(){
         ( new KeywordVolumeImporter() )->render();
     }
@@ -162,7 +171,6 @@ class Menu {
     }
 
     private function get_menu_icon(){
-        // Inline SVG — hafif ve özel görünüm
         return 'data:image/svg+xml;base64,' . base64_encode(
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#a7aaad" stroke-width="2">
                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>

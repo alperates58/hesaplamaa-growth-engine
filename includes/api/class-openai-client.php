@@ -560,6 +560,49 @@ class OpenAIClient {
         return $ideas;
     }
 
+    public function generate_seo_radar_suggestion( array $payload ){
+        $settings = $this->get_settings();
+
+        if ( empty( $settings['api_key'] ) ) {
+            return new \WP_Error( 'hge_ai_missing_key', sprintf( __( '%s API key tanÄ±mlÄ± deÄŸil.', 'hge' ), $this->get_provider_label() ) );
+        }
+
+        if ( ! $this->has_daily_quota() ) {
+            return new \WP_Error( 'hge_ai_limit', __( 'GÃ¼nlÃ¼k AI analiz limiti doldu.', 'hge' ) );
+        }
+
+        $model    = $this->resolve_model( $settings );
+        $messages = [
+            [
+                'role'    => 'system',
+                'content' => 'Sen hesaplamaa.com icin SEO radar asistansÄ±n. Sadece geÃ§erli JSON dondur. Otomatik yayÄ±n Ã¶nermeden, yalnÄ±zca analiz ve editoryal Ã¶neri uret.',
+            ],
+            [
+                'role'    => 'user',
+                'content' => "Asagidaki satir icin yalnizca oneriler uret. JSON alanlari: radar_title, meta_description, faq_items, intro_suggestion, anchor_suggestions, rationale.\n\n" . wp_json_encode( $payload, JSON_UNESCAPED_UNICODE ),
+            ],
+        ];
+
+        $result = $this->request_json( $settings, $model, $messages, 1200, true );
+        if ( is_wp_error( $result ) ) {
+            return $result;
+        }
+
+        $data = json_decode( (string) $result['text'], true );
+        if ( ! is_array( $data ) ) {
+            return new \WP_Error( 'hge_ai_invalid_json', __( 'AI yanÄ±tÄ± JSON formatÄ±nda alÄ±namadÄ±.', 'hge' ) );
+        }
+
+        $this->increment_daily_usage();
+
+        return [
+            'model'    => $model,
+            'provider' => $this->get_provider_label( (string) ( $settings['provider'] ?? '' ) ),
+            'insight'  => $this->sanitize_seo_radar_insight( $data ),
+            'usage'    => $result['usage'],
+        ];
+    }
+
     private function build_prompt( array $payload ){
         $keyword = sanitize_text_field( $payload['keyword'] ?? '' );
         $context = [
@@ -621,6 +664,34 @@ class OpenAIClient {
             'meta_title'        => sanitize_text_field( $data['meta_title'] ?? '' ),
             'meta_description'  => sanitize_textarea_field( $data['meta_description'] ?? '' ),
             'slug'              => sanitize_title( $data['slug'] ?? '' ),
+        ];
+    }
+
+    private function sanitize_seo_radar_insight( array $data ){
+        $faqs    = [];
+        $anchors = [];
+
+        foreach ( array_slice( (array) ( $data['faq_items'] ?? [] ), 0, 5 ) as $item ) {
+            $item = sanitize_text_field( $item );
+            if ( $item !== '' ) {
+                $faqs[] = $item;
+            }
+        }
+
+        foreach ( array_slice( (array) ( $data['anchor_suggestions'] ?? [] ), 0, 3 ) as $item ) {
+            $item = sanitize_text_field( $item );
+            if ( $item !== '' ) {
+                $anchors[] = $item;
+            }
+        }
+
+        return [
+            'radar_title'        => sanitize_text_field( $data['radar_title'] ?? '' ),
+            'meta_description'   => sanitize_textarea_field( $data['meta_description'] ?? '' ),
+            'faq_items'          => $faqs,
+            'intro_suggestion'   => sanitize_textarea_field( $data['intro_suggestion'] ?? '' ),
+            'anchor_suggestions' => $anchors,
+            'rationale'          => sanitize_textarea_field( $data['rationale'] ?? '' ),
         ];
     }
 
